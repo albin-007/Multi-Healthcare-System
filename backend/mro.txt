@@ -1,0 +1,1 @@
+<class 'users.serializers.VerificationDocumentSerializer'> -> <class 'rest_framework.serializers.ModelSerializer'> -> <class 'rest_framework.serializers.Serializer'> -> <class 'rest_framework.serializers.BaseSerializer'> -> <class 'rest_framework.fields.Field'> -> <class 'object'>

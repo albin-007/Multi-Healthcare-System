@@ -1,0 +1,20 @@
+--- Users ---
+User 1: admin, Role: ADMIN
+User 2: abey, Role: USER
+User 8: asif, Role: USER
+User 17: appolo_clinic, Role: CLINIC
+User 23: geethika, Role: USER
+User 26: global1011, Role: LAB
+User 27: Med_well, Role: CLINIC
+User 31: Anna_paul, Role: DOCTOR
+User 32: Dr.anna, Role: DOCTOR
+User 34: Dr _zach, Role: DOCTOR
+User 35: paul_paul, Role: DOCTOR
+User 36: DDRC, Role: LAB
+User 37: testuser1, Role: USER
+User 38: testuser2, Role: USER
+
+--- Doctors ---
+Doctor 7: Anna Paul, UserID: 31
+Doctor 11: ZACHARIAH, UserID: 34
+Doctor 12: paul, UserID: 35

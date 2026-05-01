@@ -1,0 +1,16 @@
+{
+  "source_directories": [
+    "c:/Users/albin/medical-scheduler/backend"
+  ],
+  "site_package_search_strategy": "all",
+  "search_path": [
+    "c:/Users/albin/medical-scheduler/backend",
+    "c:/Users/albin/medical-scheduler/backend/venv/Lib/site-packages"
+  ],
+  "ignore_all_errors": [
+    "c:/Users/albin/medical-scheduler/backend/venv"
+  ],
+  "exclude": [
+    "**/node_modules/.*"
+  ]
+}

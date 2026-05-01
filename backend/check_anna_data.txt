@@ -1,0 +1,8 @@
+--- Doctor 7 (User 31, Anna Paul) ---
+Appointments: 12
+Availabilities: 5
+
+--- User 32 (Dr.anna) Doctor Profile ---
+Doctor ID: 13
+Appointments: 0
+Availabilities: 0
