@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import { useAuth } from '../../hooks/useAuth';
@@ -14,12 +14,19 @@ import {
   Building2, MapPin, Stethoscope, PlusCircle, Users, AlertCircle,
   Calendar, Activity, LogOut, ShieldCheck, ArrowUpRight, CheckCircle2, X,
   LayoutDashboard, Menu, Search, Clock, Eye, Ban, FileText, User as UserIcon, HeartPulse, Download,
-  TrendingUp, DollarSign, Pin, Settings, Save, BarChart as BarIcon, PieChart as PieIcon, UploadCloud, ActivitySquare
+  TrendingUp, DollarSign, Pin, Settings, Save, BarChart as BarIcon, PieChart as PieIcon, UploadCloud, ActivitySquare, ChevronDown
 } from 'lucide-react';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell
+} from 'recharts';
+import { motion } from 'framer-motion';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function ClinicDashboard() {
   const navigate = useNavigate();
   const { logout, userName } = useAuth();
+  const { theme } = useTheme();
   const [profile, setProfile] = useState(null);
   const [doctors, setDoctors] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -44,10 +51,64 @@ export default function ClinicDashboard() {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [cancelAppointment, setCancelAppointment] = useState(null);
   const [selectedPatientFile, setSelectedPatientFile] = useState(null);
+  const getLocalYYYYMMDD = (dObj) => {
+    const y = dObj.getFullYear();
+    const m = String(dObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+
+  const [selectedPreviewDate, setSelectedPreviewDate] = useState(getLocalYYYYMMDD(new Date()));
+  const [selectedPreviewDoctor, setSelectedPreviewDoctor] = useState('');
+  const [daySlots, setDaySlots] = useState([]);
+  const [loadingDaySlots, setLoadingDaySlots] = useState(false);
+
+  const fetchDaySlots = async (date, doctorId) => {
+    if (!doctorId) {
+      setDaySlots([]);
+      return;
+    }
+    try {
+      setLoadingDaySlots(true);
+      const res = await api.get(`appointments/slots/all_slots/?doctor_id=${doctorId}&date=${date}`);
+      setDaySlots(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch day slots:', err);
+      setDaySlots([]);
+    } finally {
+      setLoadingDaySlots(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedPreviewDate && selectedPreviewDoctor) {
+      fetchDaySlots(selectedPreviewDate, selectedPreviewDoctor);
+    }
+  }, [selectedPreviewDate, selectedPreviewDoctor]);
+
+  const groupedSlots = useMemo(() => {
+    const groups = {
+      Morning: [],
+      Afternoon: [],
+      Evening: []
+    };
+    
+    (daySlots || []).forEach(slot => {
+      const hour = new Date(slot.start_time).getHours();
+      if (hour < 12) groups.Morning.push(slot);
+      else if (hour < 17) groups.Afternoon.push(slot);
+      else groups.Evening.push(slot);
+    });
+    
+    return groups;
+  }, [daySlots]);
   
   // New Doctor Form
   const [showAddDoctorModal, setShowAddDoctorModal] = useState(false);
-  const [docData, setDocData] = useState({ name: '', specialty: '', username: '', password: '', email: '', qualification: '', license_no: '' });
+  const [docData, setDocData] = useState({ 
+    name: '', specialty: '', qualification: '', license_no: '', 
+    username: '', password: '', email: '', phone_number: '' 
+  });
 
   const uniquePatients = useMemo(() => {
     return [...new Map(
@@ -104,12 +165,42 @@ export default function ClinicDashboard() {
        width: `${Math.max((m.count / maxCount) * 100, 5)}%`
      }));
 
-     return { statusStats, monthlyStats };
+     // 3. Daily Stats (Last 10 Days) - FOR CHART
+     const dailyTrend = [];
+
+     for (let i = 9; i >= 0; i--) {
+       const d = new Date();
+       d.setDate(d.getDate() - i);
+       const targetDateStr = getLocalYYYYMMDD(d);
+       const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+       
+       const dayAppts = appts.filter(a => {
+         if (!a.date) return false;
+         const apptDate = new Date(a.date);
+         return getLocalYYYYMMDD(apptDate) === targetDateStr;
+       });
+
+       const confirmedAppts = dayAppts.filter(a => ['COMPLETED', 'CONFIRMED'].includes(a.status));
+       
+       const revenue = confirmedAppts.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+       const visits = dayAppts.length;
+
+       dailyTrend.push({
+         date: targetDateStr,
+         label,
+         revenue,
+         visits
+       });
+     }
+
+     return { statusStats, monthlyStats, dailyTrend };
   }, [appointments]);
 
   // Profile Management State
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState({ name: '', address: '', payment_type: 'BOTH', consultation_fee: 150, advance_payment: '' });
+  const [profileForm, setProfileForm] = useState({ name: '', address: '', payment_type: 'BOTH', consultation_fee: 150, advance_payment: '', new_password: '', confirm_password: '' });
+  const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
 
   useEffect(() => {
     if (profile) {
@@ -129,7 +220,7 @@ export default function ClinicDashboard() {
     fetchClinicData();
   }, []);
 
-  const navItems = [
+  const navItems = useMemo(() => [
     { id: 'Dashboard', icon: LayoutDashboard, label: 'Analytics' },
     { id: 'Appointments', icon: Calendar, label: 'Appointment calendar' },
     { id: 'Patients', icon: Users, label: 'Patients' },
@@ -138,12 +229,15 @@ export default function ClinicDashboard() {
     { id: 'Payments', icon: DollarSign, label: 'Payments' },
     { id: 'Report', icon: FileText, label: 'Analytics Report' },
     { id: 'Profile', icon: Settings, label: 'Facility Settings' }
-  ];
+  ], []);
 
   useEffect(() => {
     setSubTabs(navItems);
+  }, [navItems, setSubTabs]);
+
+  useEffect(() => {
     if (!activeSubTab) setActiveSubTab('Dashboard');
-  }, []);
+  }, [activeSubTab, setActiveSubTab]);
 
   const fetchClinicData = async (isManual = false) => {
     try {
@@ -252,14 +346,54 @@ export default function ClinicDashboard() {
     
     setIsUpdatingProfile(true);
     try {
-      const res = await api.patch(`users/clinics/${profile.id}/`, profileForm);
-      setProfile(res.data);
-      showToast("Facility profile updated successfully.");
+      const formData = new FormData();
+      formData.append('name', profileForm.name);
+      formData.append('address', profileForm.address);
+      formData.append('payment_type', profileForm.payment_type);
+      formData.append('consultation_fee', profileForm.consultation_fee);
+      
+      if (profileForm.advance_payment) {
+        formData.append('advance_payment', profileForm.advance_payment);
+      }
+      
+      if (profileForm.new_password) {
+        if (profileForm.new_password !== profileForm.confirm_password) {
+          showToast("Passwords do not match", "error");
+          setIsUpdatingProfile(false);
+          return;
+        }
+        formData.append('new_password', profileForm.new_password);
+        formData.append('confirm_password', profileForm.confirm_password);
+      }
+
+      if (selectedAvatar) {
+        formData.append('avatar', selectedAvatar);
+      }
+
+      await api.patch('users/profiles/update_me/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      showToast("Facility profile synchronized successfully");
+      setProfileForm({ ...profileForm, new_password: '', confirm_password: '' });
+      setSelectedAvatar(null);
+      setAvatarPreview(null);
+      fetchClinicData();
     } catch (err) {
-      console.error("Profile Update Error:", err);
-      showToast("Failed to update facility profile.", "error");
+      console.error("Profile Sync Error:", err);
+      showToast("Failed to synchronize profile. Check network node.", "error");
     } finally {
       setIsUpdatingProfile(false);
+    }
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedAvatar(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setAvatarPreview(reader.result);
+      reader.readAsDataURL(file);
     }
   };
 
@@ -477,8 +611,12 @@ export default function ClinicDashboard() {
                 <tr key={appt.id} className="hover:bg-brand-50 dark:bg-slate-950/50 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-slate-950 flex items-center justify-center text-brand-600 font-black shadow-sm group-hover:scale-110 transition-transform">
-                        {appt.user?.name?.charAt(0) || 'U'}
+                      <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-slate-950 flex items-center justify-center text-brand-600 font-black shadow-sm group-hover:scale-110 transition-transform overflow-hidden border border-brand-100 dark:border-slate-800">
+                        {appt.user?.avatar_url ? (
+                          <img src={appt.user.avatar_url} className="w-full h-full object-cover" alt="User" />
+                        ) : (
+                          appt.user?.first_name?.charAt(0) || 'U'
+                        )}
                       </div>
                       <div>
                         <p className="font-black text-slate-900 dark:text-white text-sm tracking-tight">
@@ -494,7 +632,9 @@ export default function ClinicDashboard() {
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-2 text-slate-600">
                       <Clock className="w-3.5 h-3.5" />
-                      <span className="text-sm font-black tracking-tight">{appt.time_slot || 'Pending'}</span>
+                      <span className="text-sm font-black tracking-tight">
+                        {appt.time_slot || (appt.date ? new Date(appt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Pending')}
+                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-5 font-black text-slate-700 text-sm">
@@ -629,56 +769,74 @@ export default function ClinicDashboard() {
                   <div className="flex items-center justify-between mb-8">
                     <div>
                       <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-                        <TrendingUp className="w-5 h-5 text-brand-500" /> Revenue Analytics
+                        <TrendingUp className="w-5 h-5 text-brand-500" /> Daily Revenue & Visit Trend
                       </h3>
-                      <p className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500 mt-1">Activity over the last 7 days</p>
+                      <p className="text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500 mt-1">Growth trajectory over the last 10 days</p>
                     </div>
                   </div>
 
-                  {/* Custom SVG Area Chart */}
-                  <div className="h-64 mt-4 relative">
-                    <svg viewBox="0 0 700 200" className="w-full h-full text-brand-600">
-                      <defs>
-                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="currentColor" stopOpacity="0.2" />
-                          <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      {[0, 50, 100, 150].map(y => (
-                        <line key={y} x1="0" y1={y} x2="700" y2={y} stroke="#F1F5F9" strokeWidth="1" />
-                      ))}
-                      <path 
-                        d="M0,180 L100,140 L200,160 L300,90 L400,120 L500,60 L600,100 L700,40 L700,200 L0,200 Z" 
-                        fill="url(#chartGradient)"
-                      />
-                      <path 
-                        d="M0,180 L100,140 L200,160 L300,90 L400,120 L500,60 L600,100 L700,40" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="4" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                        className="animate-in fade-in duration-1000 slide-in-from-left-8"
-                      />
-                      {[
-                        {x:0,y:180}, {x:100,y:140}, {x:200,y:160}, {x:300,y:90}, 
-                        {x:400,y:120}, {x:500,y:60}, {x:600,y:100}, {x:700,y:40}
-                      ].map((p, i) => (
-                        <circle 
-                          key={i} 
-                          cx={p.x} cy={p.y} r="6" 
-                          fill="white" 
-                          stroke="currentColor" 
-                          strokeWidth="3"
-                          className="hover:scale-150 transition-transform cursor-pointer"
+                  {/* Dynamic Recharts Area Chart */}
+                  <div className="h-80 mt-4 relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={analytics.dailyTrend}>
+                        <defs>
+                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#334155' : '#f1f5f9'} />
+                        <XAxis 
+                          dataKey="label" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} 
                         />
-                      ))}
-                    </svg>
-                    <div className="flex justify-between mt-6 px-2">
-                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Today'].map(day => (
-                        <span key={day} className="text-[10px] font-black uppercase tracking-tighter text-slate-400 dark:text-slate-500">{day}</span>
-                      ))}
-                    </div>
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 10, fontWeight: 900, fill: '#94a3b8' }} 
+                        />
+                        <Tooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-2xl border border-brand-50 dark:border-slate-800">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">{payload[0].payload.label}</p>
+                                  <div className="space-y-1">
+                                    <p className="text-sm font-black text-emerald-600">revenue : {payload[0].value}</p>
+                                    <p className="text-sm font-black text-blue-600">visits : {payload[1].value}</p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="revenue" 
+                          stroke="#10b981" 
+                          strokeWidth={4}
+                          fillOpacity={1} 
+                          fill="url(#colorRevenue)" 
+                          animationDuration={1500}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="visits" 
+                          stroke="#3b82f6" 
+                          strokeWidth={4}
+                          fillOpacity={1} 
+                          fill="url(#colorVisits)" 
+                          animationDuration={2000}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
 
@@ -816,12 +974,117 @@ export default function ClinicDashboard() {
 
           {/* Appointments Tab */}
           {activeTab === 'Appointments' && (
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-xl shadow-slate-200/30 overflow-hidden flex flex-col animate-in slide-in-from-bottom-8 duration-700">
-               <div className="p-8 border-b border-slate-50 bg-white dark:bg-slate-900">
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Booking Pipeline</h3>
-                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1">Manage all clinical appointments</p>
+            <div className="space-y-8 animate-in slide-in-from-bottom-8 duration-700">
+               {/* ── Daily Schedule Preview Section ── */}
+               <div className="bg-white dark:bg-slate-900 border border-brand-50 dark:border-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/40 p-8">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight italic">Daily Schedule Preview</h3>
+                      <p className="text-sm text-slate-500 font-medium mt-1">Review generated slots and patient flow for a specific date.</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="relative">
+                        <Stethoscope className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-600" />
+                        <select 
+                          value={selectedPreviewDoctor}
+                          onChange={(e) => setSelectedPreviewDoctor(e.target.value)}
+                          className="pl-10 pr-10 h-11 bg-brand-50 border border-brand-100 rounded-xl text-xs font-bold focus:outline-none appearance-none cursor-pointer"
+                        >
+                          <option value="">Select Doctor</option>
+                          {doctors.map(doc => (
+                            <option key={doc.id} value={doc.id}>{doc.name}</option>
+                          ))}
+                        </select>
+                        <Clock className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                      </div>
+
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-600" />
+                        <input 
+                          type="date" 
+                          value={selectedPreviewDate}
+                          onChange={(e) => setSelectedPreviewDate(e.target.value)}
+                          className="pl-10 pr-4 h-11 bg-brand-50 border border-brand-100 rounded-xl text-xs font-bold focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {!selectedPreviewDoctor ? (
+                    <div className="py-20 text-center bg-slate-50/50 dark:bg-slate-950/50 rounded-3xl border border-dashed border-slate-200">
+                       <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                       <h4 className="font-bold text-slate-900 dark:text-white">Choose a doctor to see their schedule</h4>
+                    </div>
+                  ) : loadingDaySlots ? (
+                    <div className="py-20 text-center">
+                      <div className="w-12 h-12 border-4 border-brand-100 border-t-brand-600 rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Syncing Schedule...</p>
+                    </div>
+                  ) : daySlots.length === 0 ? (
+                    <div className="py-20 text-center bg-slate-50/50 dark:bg-slate-950/50 rounded-3xl border border-dashed border-slate-200">
+                      <ActivitySquare className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                      <h4 className="font-bold text-slate-900 dark:text-white">No slots available for this doctor on this date</h4>
+                      <p className="text-xs text-slate-400 mt-1">Ask the doctor to configure their working hours.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-12">
+                      <div className="flex items-center gap-6 pb-6 border-b border-slate-100">
+                         <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-brand-500"></div>
+                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Available</span>
+                         </div>
+                         <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Booked</span>
+                         </div>
+                      </div>
+
+                      {Object.entries(groupedSlots).map(([group, slots]) => slots.length > 0 && (
+                        <div key={group} className="space-y-6">
+                           <div className="flex items-center gap-4">
+                              <h5 className="font-black text-slate-900 dark:text-white uppercase tracking-[0.2em] text-[10px]">{group} Session</h5>
+                              <div className="h-px flex-1 bg-gradient-to-r from-slate-100 to-transparent"></div>
+                           </div>
+                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                              {slots.map(slot => (
+                                <div 
+                                  key={slot.id}
+                                  className={`relative p-5 rounded-3xl border transition-all duration-300 ${slot.is_booked ? 'bg-rose-50/50 border-rose-100 ring-4 ring-rose-500/5' : 'bg-white dark:bg-slate-900 border-slate-100 hover:border-brand-200 hover:shadow-lg hover:shadow-brand-500/5 cursor-default'}`}
+                                >
+                                  <div className="flex flex-col items-center text-center gap-3">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${slot.is_booked ? 'bg-rose-100 text-rose-600 shadow-inner' : 'bg-slate-50 text-slate-400'}`}>
+                                       <Clock size={18} />
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-black text-slate-900 dark:text-white">
+                                        {new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </p>
+                                      <Badge className={`mt-2 font-black text-[9px] uppercase tracking-widest border-0 ${slot.is_booked ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                        {slot.is_booked ? 'Booked' : 'Available'}
+                                      </Badge>
+                                    </div>
+                                    {slot.is_booked && slot.booking_details && (
+                                      <p className="text-[10px] font-bold text-rose-700 bg-rose-100/50 px-2 py-1 rounded-lg w-full truncate" title={slot.booking_details.user?.username}>
+                                        {slot.booking_details.user?.username || 'Patient'}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                </div>
-               {renderAppointmentTable(appointments)}
+
+               <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-xl shadow-slate-200/30 overflow-hidden flex flex-col">
+                  <div className="p-8 border-b border-slate-50 bg-white dark:bg-slate-900">
+                     <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Booking Pipeline</h3>
+                     <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1">Manage all clinical appointments</p>
+                  </div>
+                  {renderAppointmentTable(appointments)}
+               </div>
             </div>
           )}
 
@@ -853,7 +1116,7 @@ export default function ClinicDashboard() {
                       <div className="absolute top-0 right-0 w-24 h-24 bg-brand-50 dark:bg-slate-950/50 rounded-bl-[4rem] -mr-8 -mt-8 group-hover:bg-brand-100/50 transition-colors" />
                       <div className="flex items-start gap-4 relative">
                         <img 
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${doctor.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                          src={doctor.user_details?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${doctor.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
                           className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 border border-brand-50 dark:border-slate-800 shadow-sm group-hover:scale-110 transition-all object-cover"
                           alt={doctor.name}
                         />
@@ -1094,9 +1357,19 @@ export default function ClinicDashboard() {
                   {/* Sidebar Info */}
                   <div className="md:col-span-1 space-y-6">
                      <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-xl shadow-slate-200/20 text-center">
-                        <div className="w-20 h-20 bg-brand-50 dark:bg-slate-950 text-brand-600 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
-                           <Building2 className="w-8 h-8 font-black" />
-                        </div>
+                         <div className="relative mx-auto mb-4 w-20 h-20">
+                            <div className="w-full h-full bg-brand-50 dark:bg-slate-950 text-brand-600 rounded-[2rem] flex items-center justify-center shadow-inner overflow-hidden border-4 border-white dark:border-slate-800">
+                               {avatarPreview || profile?.admin_user?.avatar_url ? (
+                                 <img src={avatarPreview || profile?.admin_user?.avatar_url} className="w-full h-full object-cover" alt="Clinic Logo" />
+                               ) : (
+                                 <Building2 className="w-8 h-8 font-black" />
+                               )}
+                            </div>
+                            <label className="absolute -bottom-1 -right-1 w-7 h-7 bg-brand-600 text-white rounded-xl flex items-center justify-center cursor-pointer hover:bg-brand-700 transition-all shadow-lg border-2 border-white dark:border-slate-900">
+                               <Download className="w-4 h-4 rotate-180" />
+                               <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                            </label>
+                         </div>
                         <h4 className="font-black text-slate-900 dark:text-white text-lg">{profile?.name}</h4>
                         <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Verified Medical Hub</p>
                         
@@ -1185,6 +1458,34 @@ export default function ClinicDashboard() {
                                         className="h-14 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm"
                                         placeholder="Leave empty for no advance payment"
                                      />
+                                  </div>
+
+                                  <div className="md:col-span-2 pt-6 border-t border-slate-50 dark:border-slate-800">
+                                     <h4 className="text-sm font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                        <ShieldCheck className="w-4 h-4 text-brand-600" /> Security Update
+                                     </h4>
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">New Password</Label>
+                                           <Input 
+                                              type="password"
+                                              value={profileForm.new_password}
+                                              onChange={(e) => setProfileForm({...profileForm, new_password: e.target.value})}
+                                              className="h-14 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm"
+                                              placeholder="Leave blank to keep current"
+                                           />
+                                        </div>
+                                        <div className="space-y-2">
+                                           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Confirm New Password</Label>
+                                           <Input 
+                                              type="password"
+                                              value={profileForm.confirm_password}
+                                              onChange={(e) => setProfileForm({...profileForm, confirm_password: e.target.value})}
+                                              className="h-14 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm"
+                                              placeholder="Repeat new password"
+                                           />
+                                        </div>
+                                     </div>
                                   </div>
                                </div>
 
@@ -1281,6 +1582,10 @@ export default function ClinicDashboard() {
                   <Label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Password</Label>
                   <Input type="password" value={docData.password} onChange={e => setDocData({...docData, password: e.target.value})} required className="rounded-xl border-slate-200" placeholder="Min. 8 characters" />
                 </div>
+              </div>
+              <div className="space-y-1">
+                 <Label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Phone Number</Label>
+                 <Input value={docData.phone_number} onChange={e => setDocData({...docData, phone_number: e.target.value})} className="rounded-xl border-slate-200" placeholder="+91 XXXXX XXXXX" />
               </div>
               <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold px-1">Password must be at least 8 characters and not entirely numeric.</p>
               <Button
@@ -1460,7 +1765,9 @@ export default function ClinicDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl border border-brand-50 dark:border-slate-800 bg-white dark:bg-slate-900">
                      <p className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1">Schedule</p>
-                     <p className="font-bold text-slate-900 dark:text-white">{selectedAppointment.date ? new Date(selectedAppointment.date).toLocaleDateString() : 'N/A'} at {selectedAppointment.time_slot || 'N/A'}</p>
+                     <p className="font-bold text-slate-900 dark:text-white">
+                        {selectedAppointment.date ? new Date(selectedAppointment.date).toLocaleDateString() : 'N/A'} at {selectedAppointment.date ? new Date(selectedAppointment.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (selectedAppointment.time_slot || 'N/A')}
+                     </p>
                   </div>
                   <div className="p-4 rounded-xl border border-brand-50 dark:border-slate-800 bg-white dark:bg-slate-900">
                      <p className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1">Doctor Assigned</p>

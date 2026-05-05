@@ -349,8 +349,16 @@ const FindTests = () => {
                       className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition-all group"
                     >
                       <div className="flex items-center gap-5 mb-8">
-                        <div className="w-20 h-20 bg-blue-50 rounded-[1.8rem] flex items-center justify-center shrink-0 border-4 border-white shadow-lg">
-                          <Microscope className="text-[#3B82F6]" size={32} />
+                        <div className="w-20 h-20 bg-blue-50 rounded-[1.8rem] flex items-center justify-center shrink-0 border-4 border-white shadow-lg overflow-hidden">
+                           {test.lab_details?.avatar_url ? (
+                             <img 
+                               src={test.lab_details.avatar_url} 
+                               alt={test.lab_details.name} 
+                               className="w-full h-full object-cover"
+                             />
+                           ) : (
+                             <Microscope className="text-[#3B82F6]" size={32} />
+                           )}
                         </div>
                         <div>
                           <h4 className="text-xl font-black text-[#1A3C34] group-hover:text-[#3B82F6] transition-colors">{test.name}</h4>

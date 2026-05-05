@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -68,15 +68,45 @@ export default function DoctorDashboard() {
   const [daySlots, setDaySlots] = useState([]);
   const [loadingDaySlots, setLoadingDaySlots] = useState(false);
 
+  const groupedSlots = useMemo(() => {
+    const groups = {
+      Morning: [],
+      Afternoon: [],
+      Evening: []
+    };
+    
+    (daySlots || []).forEach(slot => {
+      const hour = new Date(slot.start_time).getHours();
+      if (hour < 12) groups.Morning.push(slot);
+      else if (hour < 17) groups.Afternoon.push(slot);
+      else groups.Evening.push(slot);
+    });
+    
+    return groups;
+  }, [daySlots]);
+
+  const [doctorBreaks, setDoctorBreaks] = useState([]);
+  const [doctorLeaves, setDoctorLeaves] = useState([]);
+  const [newBreak, setNewBreak] = useState({ day_of_week: 0, start_time: '13:00', end_time: '14:00' });
+  const [newLeave, setNewLeave] = useState({ date: new Date().toISOString().split('T')[0], reason: '' });
+
+  // Profile management state
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ new_password: '', confirm_password: '' });
+  const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+
   const fetchData = async () => {
     try {
-      const [aptRes, labRes, preRes, availRes, testsRes, testReqRes] = await Promise.all([
+      const [aptRes, labRes, preRes, availRes, testsRes, testReqRes, breakRes, leaveRes] = await Promise.all([
         api.get('appointments/'),
         api.get('users/labs/'),
         api.get('records/prescriptions/'),
         api.get('appointments/availability/'),
         api.get('users/lab-tests/'),
         api.get('users/test-requests/'),
+        api.get('appointments/breaks/'),
+        api.get('appointments/leaves/'),
       ]);
       setAppointments(aptRes.data || []);
       setLabs(labRes.data || []);
@@ -84,6 +114,8 @@ export default function DoctorDashboard() {
       setAvailabilities(availRes.data || []);
       setAllLabTests(testsRes.data || []);
       setTestRequests(testReqRes.data || []);
+      setDoctorBreaks(breakRes.data || []);
+      setDoctorLeaves(leaveRes.data || []);
     } catch (err) {
       console.error('Failed to fetch doctor dashboard data:', err);
       // Optional: Set defaults on error to prevent undefined maps
@@ -140,6 +172,50 @@ export default function DoctorDashboard() {
     }
   };
 
+  const handleAddBreak = async (e) => {
+    e.preventDefault();
+    try {
+      const doctorRes = await api.get('users/doctors/me/');
+      await api.post('appointments/breaks/', { ...newBreak, doctor: doctorRes.data.id });
+      fetchData();
+      showToast('Break time added.');
+    } catch (err) {
+      showToast('Failed to add break.', 'error');
+    }
+  };
+
+  const handleDeleteBreak = async (id) => {
+    try {
+      await api.delete(`appointments/breaks/${id}/`);
+      fetchData();
+      showToast('Break removed.');
+    } catch (err) {
+      showToast('Failed to remove break.', 'error');
+    }
+  };
+
+  const handleAddLeave = async (e) => {
+    e.preventDefault();
+    try {
+      const doctorRes = await api.get('users/doctors/me/');
+      await api.post('appointments/leaves/', { ...newLeave, doctor: doctorRes.data.id });
+      fetchData();
+      showToast('Emergency leave recorded.');
+    } catch (err) {
+      showToast('Failed to record leave.', 'error');
+    }
+  };
+
+  const handleDeleteLeave = async (id) => {
+    try {
+      await api.delete(`appointments/leaves/${id}/`);
+      fetchData();
+      showToast('Leave cancelled.');
+    } catch (err) {
+      showToast('Failed to cancel leave.', 'error');
+    }
+  };
+
   const fetchDaySlots = async (date) => {
     try {
       setLoadingDaySlots(true);
@@ -168,22 +244,27 @@ export default function DoctorDashboard() {
     appointments.filter(a => a.user).map(a => [a.user.id, a.user])
   ).values()];
 
-  const navItems = [
+  const navItems = useMemo(() => [
     { id: 'Appointments', icon: Calendar,     label: 'Appointments',  badge: pendingApts.length },
+    { id: 'Daily Schedule', icon: ActivitySquare, label: 'Daily Planner' },
     { id: 'Patients',     icon: Users,        label: 'Patients' },
     { id: 'Availability', icon: Clock,        label: 'My Schedule' },
     { id: 'Prescriptions',icon: ClipboardList, label: 'Prescriptions' },
     { id: 'Lab Requests', icon: FlaskConical,  label: 'Lab Requests' },
-    { id: 'Notifications',icon: Bell,          label: 'Notifications', badge: unreadCount },
-  ];
+    { id: 'Notifications', icon: Bell,         label: 'Notifications', badge: unreadCount },
+    { id: 'Profile',      icon: User,          label: 'Security Settings' },
+  ], [pendingApts.length, unreadCount]);
 
   useEffect(() => {
     setSubTabs(navItems);
-    if (!activeSubTab) setActiveSubTab('Appointments');
-  }, [pendingApts.length]);
+  }, [navItems, setSubTabs]);
 
   useEffect(() => {
-    if (activeTab === 'Availability' && selectedDateFilter) {
+    if (!activeSubTab) setActiveSubTab('Appointments');
+  }, [activeSubTab, setActiveSubTab]);
+
+  useEffect(() => {
+    if ((activeTab === 'Availability' || activeTab === 'Daily Schedule') && selectedDateFilter) {
       fetchDaySlots(selectedDateFilter);
     }
   }, [selectedDateFilter, activeTab]);
@@ -249,11 +330,58 @@ export default function DoctorDashboard() {
         api.get(`records/test-results/?patient_id=${patientId}`),
       ]);
       setPatientHistory({
-        prescriptions: preRes.data,
-        tests: testRes.data
+        prescriptions: preRes.data || [],
+        tests: testRes.data || [],
       });
     } catch (err) {
-      console.error('Failed to fetch patient history:', err);
+      console.error('History fetch error:', err);
+    }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    
+    setIsUpdatingProfile(true);
+    try {
+      const formData = new FormData();
+      if (profileForm.new_password) {
+        if (profileForm.new_password !== profileForm.confirm_password) {
+          showToast("Passwords do not match.", "error");
+          setIsUpdatingProfile(false);
+          return;
+        }
+        formData.append('new_password', profileForm.new_password);
+        formData.append('confirm_password', profileForm.confirm_password);
+      }
+      
+      if (selectedAvatar) {
+        formData.append('avatar', selectedAvatar);
+      }
+
+      await api.patch('users/profiles/update_me/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setProfileForm({ new_password: '', confirm_password: '' });
+      setSelectedAvatar(null);
+      setAvatarPreview(null);
+      showToast("Security profile updated successfully.");
+      fetchData(); // Refresh to show new avatar
+    } catch (err) {
+      console.error("Profile Update Error:", err);
+      showToast("Failed to update profile. Check requirements.", "error");
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedAvatar(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setAvatarPreview(reader.result);
+      reader.readAsDataURL(file);
     }
   };
 
@@ -275,7 +403,8 @@ export default function DoctorDashboard() {
   };
 
   return (
-    <div className="space-y-8">
+    <>
+      <div className="space-y-8">
 
           {/* ═══ APPOINTMENTS TAB ══════════════════════════════════════ */}
           {activeTab === 'Appointments' && (
@@ -371,8 +500,8 @@ export default function DoctorDashboard() {
                             <div key={apt.id} className="px-8 py-5 flex items-center justify-between hover:bg-brand-50 dark:bg-slate-950/70 transition-colors group">
                               <div className="flex items-center gap-4">
                                 <img 
-                                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                                  className="h-12 w-12 rounded-2xl bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 shadow-inner group-hover:scale-110 transition-transform"
+                                  src={apt.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                                  className="h-12 w-12 rounded-2xl bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 shadow-inner group-hover:scale-110 transition-transform object-cover"
                                   alt={name}
                                 />
                                 <div>
@@ -385,7 +514,7 @@ export default function DoctorDashboard() {
                                   </div>
                                   <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-0.5">
                                     <Clock className="inline w-3 h-3 mr-1" />
-                                    {new Date(apt.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                    {apt.time_slot ? `${new Date(apt.date).toLocaleDateString([], { dateStyle: 'short' })} • ${apt.time_slot}` : new Date(apt.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                   </p>
                                 </div>
                               </div>
@@ -438,6 +567,103 @@ export default function DoctorDashboard() {
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ DAILY SCHEDULE TAB ═══════════════════════════════════ */}
+          {activeTab === 'Daily Schedule' && (
+            <div className="space-y-8 animate-in slide-in-from-bottom-8 duration-700">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Daily Planner</h3>
+                  <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-1">Real-time visualization of your booked and available slots</p>
+                </div>
+                
+                <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm">
+                  <Calendar className="w-5 h-5 text-brand-500 ml-3" />
+                  <input 
+                    type="date" 
+                    className="h-10 bg-transparent border-0 font-black text-slate-700 dark:text-white outline-none pr-3"
+                    value={selectedDateFilter}
+                    onChange={e => setSelectedDateFilter(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-brand-50 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-8">
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
+                         <Clock className="w-5 h-5" />
+                      </div>
+                      <h4 className="font-black text-slate-900 dark:text-white text-lg">Generated Slots</h4>
+                   </div>
+                   <div className="flex gap-4">
+                      <div className="flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-full bg-brand-500"></div>
+                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Available</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                         <div className="w-3 h-3 rounded-full bg-rose-500"></div>
+                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Booked</span>
+                      </div>
+                   </div>
+                </div>
+
+                {loadingDaySlots ? (
+                  <div className="py-24 text-center">
+                    <div className="w-12 h-12 border-4 border-brand-100 border-t-brand-600 rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Syncing Schedule...</p>
+                  </div>
+                ) : daySlots.length === 0 ? (
+                  <div className="py-24 text-center">
+                    <ActivitySquare className="w-16 h-16 text-slate-100 mx-auto mb-4" />
+                    <p className="text-slate-400 dark:text-slate-500 font-bold">No slots generated for this date.</p>
+                    <p className="text-xs text-slate-300 mt-1">Ensure you have working hours set for this day.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-12">
+                    {Object.entries(groupedSlots).map(([group, slots]) => slots.length > 0 && (
+                      <div key={group} className="space-y-6">
+                         <div className="flex items-center gap-4">
+                            <h5 className="font-black text-slate-900 dark:text-white uppercase tracking-[0.2em] text-[10px]">{group} Session</h5>
+                            <div className="h-px flex-1 bg-gradient-to-r from-slate-100 to-transparent"></div>
+                         </div>
+                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            {slots.map(slot => (
+                              <button
+                                key={slot.id}
+                                onClick={() => {
+                                  if (slot.is_booked && slot.booking_details) {
+                                    setSelectedAppointment(slot.booking_details);
+                                  }
+                                }}
+                                className={`group relative p-6 rounded-[2rem] border-2 transition-all duration-300 text-center flex flex-col items-center gap-3 ${
+                                  slot.is_booked 
+                                    ? 'border-rose-100 bg-rose-50/30 hover:border-rose-300 hover:shadow-lg hover:shadow-rose-500/10' 
+                                    : 'border-slate-50 bg-white hover:border-brand-200 hover:shadow-lg hover:shadow-brand-500/10'
+                                }`}
+                              >
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${slot.is_booked ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'bg-brand-50 text-brand-600'}`}>
+                                   <Clock className="w-5 h-5" />
+                                </div>
+                                <p className={`font-black text-sm tracking-tight ${slot.is_booked ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
+                                  {new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                </p>
+                                <Badge className={`border-0 font-black text-[9px] uppercase tracking-widest px-3 py-1 ${slot.is_booked ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                  {slot.is_booked ? 'Booked' : 'Available'}
+                                </Badge>
+                                {slot.is_booked && (
+                                   <div className="absolute top-3 right-3 w-2 h-2 bg-rose-500 rounded-full animate-pulse"></div>
+                                )}
+                              </button>
+                            ))}
+                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -509,7 +735,6 @@ export default function DoctorDashboard() {
                   </form>
                 </div>
 
-                {/* List of current availabilities */}
                 <div className="lg:col-span-2 space-y-4">
                   <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2 px-2">Current Schedule</h4>
                   {availabilities.length === 0 ? (
@@ -546,66 +771,99 @@ export default function DoctorDashboard() {
                 </div>
               </div>
 
-              {/* Daily Schedule Preview - Added to help doctors see generated slots */}
-              <div className="pt-8 border-t border-brand-50 dark:border-slate-800">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h4 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Daily Schedule Preview</h4>
-                    <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-1">Review the generated slots for patients on a specific date</p>
+              {/* Breaks and Leave Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-8 border-t border-brand-50 dark:border-slate-800">
+                {/* Break Times */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                      <Ban className="w-5 h-5 text-amber-500" /> Break Times
+                    </h4>
                   </div>
-                  <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm">
-                    <Calendar className="w-5 h-5 text-brand-600 ml-2" />
-                    <input 
-                      type="date"
-                      className="bg-transparent border-0 font-black text-sm focus:ring-0 outline-none pr-4"
-                      value={selectedDateFilter}
-                      onChange={e => setSelectedDateFilter(e.target.value)}
-                    />
+                  <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-brand-50 dark:border-slate-800 shadow-xl shadow-slate-200/20">
+                    <form onSubmit={handleAddBreak} className="grid grid-cols-3 gap-4 items-end mb-6">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Day</label>
+                        <select 
+                          className="w-full h-11 bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 rounded-xl px-3 font-bold text-xs"
+                          value={newBreak.day_of_week}
+                          onChange={e => setNewBreak({...newBreak, day_of_week: parseInt(e.target.value)})}
+                        >
+                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
+                            <option key={i} value={i}>{day}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Start</label>
+                        <input type="time" className="w-full h-11 bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 rounded-xl px-3 font-bold text-xs" value={newBreak.start_time} onChange={e => setNewBreak({...newBreak, start_time: e.target.value})} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">End</label>
+                        <input type="time" className="w-full h-11 bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 rounded-xl px-3 font-bold text-xs" value={newBreak.end_time} onChange={e => setNewBreak({...newBreak, end_time: e.target.value})} />
+                      </div>
+                      <Button type="submit" className="col-span-3 h-11 bg-slate-900 text-white font-bold rounded-xl mt-2">Add Recurring Break</Button>
+                    </form>
+                    
+                    <div className="space-y-3">
+                      {doctorBreaks.length === 0 ? (
+                        <p className="text-center py-4 text-slate-400 text-xs font-bold uppercase tracking-widest">No breaks defined</p>
+                      ) : (
+                        doctorBreaks.map(b => (
+                          <div key={b.id} className="flex items-center justify-between p-4 bg-brand-50/50 dark:bg-slate-950/50 rounded-2xl border border-brand-50 dark:border-slate-800">
+                            <div>
+                              <p className="text-xs font-black text-slate-900 dark:text-white">{b.day_display}</p>
+                              <p className="text-[10px] font-bold text-slate-500">{b.start_time.substring(0,5)} - {b.end_time.substring(0,5)}</p>
+                            </div>
+                            <button onClick={() => handleDeleteBreak(b.id)} className="text-rose-500 hover:scale-110 transition-transform"><X size={14}/></button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {loadingDaySlots ? (
-                  <div className="flex justify-center p-20">
-                    <div className="w-12 h-12 border-4 border-brand-100 border-t-brand-600 rounded-full animate-spin"></div>
+                {/* Emergency Leave */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-rose-500" /> Emergency Leave
+                    </h4>
                   </div>
-                ) : daySlots.length === 0 ? (
-                  <div className="bg-white dark:bg-slate-900 p-20 rounded-[3rem] border-2 border-dashed border-brand-50 dark:border-slate-800 text-center">
-                    <div className="w-20 h-20 bg-brand-50 dark:bg-slate-950 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <Ban className="w-10 h-10 text-slate-200" />
-                    </div>
-                    <p className="text-slate-400 dark:text-slate-500 font-bold text-lg">No slots available for this date.</p>
-                    <p className="text-sm text-slate-300 mt-2">Ensure you have working hours defined for this day of the week.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {daySlots.map(slot => (
-                      <div 
-                        key={slot.id} 
-                        className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-2 group relative overflow-hidden ${
-                          slot.is_booked 
-                            ? 'bg-rose-50 border-rose-100 text-rose-600' 
-                            : 'bg-white dark:bg-slate-900 border-brand-50 dark:border-slate-800 hover:border-brand-50 dark:border-slate-800 hover:shadow-xl hover:shadow-brand-500/10'
-                        }`}
-                      >
-                        <Clock className={`w-5 h-5 ${slot.is_booked ? 'text-rose-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-brand-500'}`} />
-                        <span className="font-black text-sm">
-                          {new Date(slot.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
-                        </span>
-                        <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${
-                          slot.is_booked ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-400 dark:text-slate-500'
-                        }`}>
-                          {slot.is_booked ? 'Booked' : 'Available'}
+                  <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-brand-50 dark:border-slate-800 shadow-xl shadow-slate-200/20">
+                    <form onSubmit={handleAddLeave} className="space-y-4 mb-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Date</label>
+                          <input type="date" className="w-full h-11 bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 rounded-xl px-3 font-bold text-xs" value={newLeave.date} onChange={e => setNewLeave({...newLeave, date: e.target.value})} />
                         </div>
-                        {slot.is_booked && (
-                           <div className="absolute top-0 right-0 p-1">
-                             <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                           </div>
-                        )}
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Reason (Optional)</label>
+                          <input type="text" className="w-full h-11 bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 rounded-xl px-3 font-bold text-xs" placeholder="e.g. Health Issues" value={newLeave.reason} onChange={e => setNewLeave({...newLeave, reason: e.target.value})} />
+                        </div>
                       </div>
-                    ))}
+                      <Button type="submit" className="w-full h-11 bg-rose-600 text-white font-bold rounded-xl">Declare Leave</Button>
+                    </form>
+
+                    <div className="space-y-3">
+                      {doctorLeaves.length === 0 ? (
+                        <p className="text-center py-4 text-slate-400 text-xs font-bold uppercase tracking-widest">No leaves recorded</p>
+                      ) : (
+                        doctorLeaves.map(l => (
+                          <div key={l.id} className="flex items-center justify-between p-4 bg-rose-50/50 dark:bg-rose-500/5 rounded-2xl border border-rose-100 dark:border-rose-500/10">
+                            <div>
+                              <p className="text-xs font-black text-rose-900 dark:text-rose-400">{new Date(l.date).toLocaleDateString(undefined, { dateStyle: 'medium' })}</p>
+                              <p className="text-[10px] font-bold text-rose-500">{l.reason || 'No reason provided'}</p>
+                            </div>
+                            <button onClick={() => handleDeleteLeave(l.id)} className="text-rose-500 hover:scale-110 transition-transform"><X size={14}/></button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
+
             </div>
           )}
 
@@ -664,8 +922,8 @@ export default function DoctorDashboard() {
                               <td className="px-8 py-5">
                                 <div className="flex items-center gap-3">
                                   <img 
-                                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                                    className="w-9 h-9 rounded-xl border border-brand-50 dark:border-slate-800 shadow-sm"
+                                    src={p.patient?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                                    className="w-9 h-9 rounded-xl border border-brand-50 dark:border-slate-800 shadow-sm object-cover"
                                     alt={name}
                                   />
                                   <p className="font-black text-slate-900 dark:text-white text-sm">{name}</p>
@@ -857,8 +1115,8 @@ export default function DoctorDashboard() {
                               <td className="px-8 py-5">
                                 <div className="flex items-center gap-3">
                                   <img 
-                                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                                    className="w-10 h-10 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm"
+                                    src={p.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                                    className="w-10 h-10 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm object-cover"
                                     alt={name}
                                   />
                                   <p className="font-black text-slate-900 dark:text-white text-sm">{name}</p>
@@ -958,6 +1216,106 @@ export default function DoctorDashboard() {
               </div>
             </div>
           )}
+
+          {/* ═══ PROFILE/SECURITY ═══════════════════════════════════════════ */}
+          {activeTab === 'Profile' && (
+            <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-500">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight italic">Security & Profile</h2>
+                <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 uppercase tracking-widest text-xs">Manage your clinical access credentials</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Profile Card */}
+                <div className="lg:col-span-1 space-y-6">
+                  <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-brand-50 dark:border-slate-800 shadow-xl shadow-slate-200/20 text-center relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-indigo-500 to-brand-600 opacity-10 group-hover:opacity-20 transition-opacity" />
+                    
+                    <div className="relative mt-4 mb-6 mx-auto w-32 h-32">
+                       <div className="w-full h-full rounded-[2.5rem] bg-slate-50 dark:bg-slate-950 flex items-center justify-center overflow-hidden border-4 border-white dark:border-slate-800 shadow-inner">
+                          {avatarPreview || doctorProfile?.user_details?.avatar_url ? (
+                            <img src={avatarPreview || doctorProfile?.user_details?.avatar_url} className="w-full h-full object-cover" alt="Profile" />
+                          ) : (
+                            <User className="w-12 h-12 text-slate-300" />
+                          )}
+                       </div>
+                       <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-brand-600 text-white rounded-2xl flex items-center justify-center cursor-pointer hover:bg-brand-700 hover:scale-110 active:scale-95 transition-all shadow-lg border-4 border-white dark:border-slate-900">
+                          <Download className="w-5 h-5 rotate-180" />
+                          <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                       </label>
+                    </div>
+
+                    <h4 className="text-xl font-black text-slate-900 dark:text-white">{doctorProfile?.name}</h4>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">Medical Specialist</p>
+
+                    <div className="mt-8 pt-8 border-t border-slate-50 dark:border-slate-800 grid grid-cols-2 gap-4">
+                       <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1">Consults</p>
+                          <p className="text-lg font-black text-brand-600">{appointments.length}</p>
+                       </div>
+                       <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1">Rating</p>
+                          <p className="text-lg font-black text-amber-500">4.9</p>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form */}
+                <div className="lg:col-span-2">
+                  <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-brand-50 dark:border-slate-800 shadow-sm">
+                    <form onSubmit={handleUpdateProfile} className="space-y-8">
+                      <div className="flex items-center gap-4 p-6 bg-brand-50 dark:bg-slate-950 rounded-[2rem]">
+                        <div className="w-16 h-16 rounded-2xl bg-brand-600 text-white flex items-center justify-center">
+                          <ShieldCheck className="w-8 h-8" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-slate-900 dark:text-white">Security & Identity</h3>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter mt-0.5">Synchronize credentials and bio-data</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 ml-1">New Password</label>
+                            <input 
+                              type="password"
+                              value={profileForm.new_password}
+                              onChange={(e) => setProfileForm({...profileForm, new_password: e.target.value})}
+                              placeholder="Leave blank to keep current"
+                              className="w-full h-16 px-6 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 ml-1">Confirm New Password</label>
+                            <input 
+                              type="password"
+                              value={profileForm.confirm_password}
+                              onChange={(e) => setProfileForm({...profileForm, confirm_password: e.target.value})}
+                              placeholder="Repeat your password"
+                              className="w-full h-16 px-6 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button 
+                        type="submit" 
+                        disabled={isUpdatingProfile}
+                        className="w-full h-16 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-black shadow-xl shadow-brand-500/20 group"
+                      >
+                        {isUpdatingProfile ? 'Syncing Node...' : 'Synchronize Profile Changes'}
+                        {!isUpdatingProfile && <RotateCcw className="ml-2 w-5 h-5 group-hover:rotate-180 transition-transform duration-500" />}
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
       {/* ── Patient Details & History Modal ────────────────────────────── */}
       {selectedAppointment && !showPrescriptionModal && !showLabRequestModal && (
@@ -1297,6 +1655,6 @@ export default function DoctorDashboard() {
           <span className="font-bold text-sm tracking-wide">{toast.message}</span>
         </div>
       )}
-    </div>
+    </>
   );
 }

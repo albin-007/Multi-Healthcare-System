@@ -15,7 +15,6 @@ import ProfileEditModal from '../modals/ProfileEditModal';
 
 export default function DashboardLayout() {
   const { userRole, userName, user, fetchUserProfile, logout } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -44,7 +43,7 @@ export default function DashboardLayout() {
   const navItems = getNavItems();
 
   const handleLogout = () => {
-    navigate('/logout');
+    logout();
   };
 
   // ── Animation Variants ─────────────────────────────────────────────────────

@@ -6,8 +6,11 @@ from django.utils import timezone
 from datetime import datetime, timedelta, date as dt_date
 
 from users.models import Doctor, Clinic, User, Lab
-from .models import Appointment, DoctorAvailability, AppointmentSlot, LabAvailability, LabHoliday
-from .serializers import AppointmentSerializer, AvailabilitySerializer, AppointmentSlotSerializer, LabAvailabilitySerializer, LabHolidaySerializer
+from .models import Appointment, DoctorAvailability, AppointmentSlot, LabAvailability, LabHoliday, DoctorBreak, DoctorLeave
+from .serializers import (
+    AppointmentSerializer, AvailabilitySerializer, AppointmentSlotSerializer, 
+    LabAvailabilitySerializer, LabHolidaySerializer, DoctorBreakSerializer, DoctorLeaveSerializer
+)
 
 
 class AvailabilityViewSet(viewsets.ModelViewSet):
@@ -23,6 +26,52 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
         elif self.request.user.role == 'CLINIC':
             return DoctorAvailability.objects.filter(doctor__clinic__admin_user=self.request.user)
         return DoctorAvailability.objects.none()
+
+class DoctorBreakViewSet(viewsets.ModelViewSet):
+    queryset = DoctorBreak.objects.all()
+    serializer_class = DoctorBreakSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return DoctorBreak.objects.all()
+        elif user.role == 'DOCTOR':
+            return DoctorBreak.objects.filter(doctor__user=user)
+        elif user.role == 'CLINIC':
+            return DoctorBreak.objects.filter(doctor__clinic__admin_user=user)
+        return DoctorBreak.objects.none()
+
+    def perform_create(self, serializer):
+        if self.request.user.role == 'DOCTOR':
+            doctor = getattr(self.request.user, 'doctor_profile', None)
+            if doctor:
+                serializer.save(doctor=doctor)
+                return
+        serializer.save()
+
+class DoctorLeaveViewSet(viewsets.ModelViewSet):
+    queryset = DoctorLeave.objects.all()
+    serializer_class = DoctorLeaveSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'ADMIN':
+            return DoctorLeave.objects.all()
+        elif user.role == 'DOCTOR':
+            return DoctorLeave.objects.filter(doctor__user=user)
+        elif user.role == 'CLINIC':
+            return DoctorLeave.objects.filter(doctor__clinic__admin_user=user)
+        return DoctorLeave.objects.none()
+
+    def perform_create(self, serializer):
+        if self.request.user.role == 'DOCTOR':
+            doctor = getattr(self.request.user, 'doctor_profile', None)
+            if doctor:
+                serializer.save(doctor=doctor)
+                return
+        serializer.save()
 
 class LabAvailabilityViewSet(viewsets.ModelViewSet):
     queryset = LabAvailability.objects.all()
@@ -84,58 +133,71 @@ class AppointmentSlotViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AppointmentSlotSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    @action(detail=False, methods=['get'])
-    def available_slots(self, request):
-        doctor_id = request.query_params.get('doctor_id')
-        date_str = request.query_params.get('date') # YYYY-MM-DD
+    def _generate_slots(self, doctor, target_date):
+        day_of_week = target_date.weekday()
         
-        if not doctor_id or not date_str:
-            return Response({"error": "doctor_id and date are required"}, status=400)
-            
-        try:
-            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            day_of_week = target_date.weekday()
-            doctor = Doctor.objects.get(id=doctor_id)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        # 1. Check for Emergency Leave
+        if DoctorLeave.objects.filter(doctor=doctor, date=target_date).exists():
+            return []
 
-        # 1. Ensure slots exist for this doctor/date based on DoctorAvailability
+        # 2. Get Availabilities and Breaks
         availabilities = DoctorAvailability.objects.filter(doctor=doctor, day_of_week=day_of_week)
+        breaks = DoctorBreak.objects.filter(doctor=doctor, day_of_week=day_of_week)
         
         for avail in availabilities:
-            # Generate slots if they don't exist
             current_time = datetime.combine(target_date, avail.start_time)
             end_time = datetime.combine(target_date, avail.end_time)
             
             while current_time + timedelta(minutes=avail.slot_duration) <= end_time:
                 slot_end = current_time + timedelta(minutes=avail.slot_duration)
                 
-                # Use get_or_create to avoid duplicates
-                AppointmentSlot.objects.get_or_create(
-                    doctor=doctor,
-                    start_time=timezone.make_aware(current_time),
-                    end_time=timezone.make_aware(slot_end)
-                )
+                # Check if this slot overlaps with any break
+                is_on_break = False
+                for b in breaks:
+                    break_start = datetime.combine(target_date, b.start_time)
+                    break_end = datetime.combine(target_date, b.end_time)
+                    # If slot start or end falls within a break
+                    if (current_time >= break_start and current_time < break_end) or \
+                       (slot_end > break_start and slot_end <= break_end):
+                        is_on_break = True
+                        break
+                
+                if not is_on_break:
+                    # Use get_or_create to avoid duplicates
+                    AppointmentSlot.objects.get_or_create(
+                        doctor=doctor,
+                        start_time=timezone.make_aware(current_time),
+                        end_time=timezone.make_aware(slot_end)
+                    )
+                
                 current_time = slot_end
 
-        # 2. Return slots that are NOT booked and NOT locked (by others or expired)
-        slots = AppointmentSlot.objects.filter(doctor=doctor, start_time__date=target_date)
+    @action(detail=False, methods=['get'])
+    def available_slots(self, request):
+        doctor_id = request.query_params.get('doctor_id')
+        date_str = request.query_params.get('date')
         
-        # We need to filter out expired locks and PAST SLOTS if today
-        available_slots = []
-        now = timezone.now()
-        for s in slots:
-            # Skip past slots
-            if s.start_time < now:
-                continue
-                
-            if not s.is_booked:
-                # If locked, check if it's the current user or if the lock has expired
-                if not s.is_locked() or s.locked_by == request.user:
-                    available_slots.append(s)
-        
-        serializer = self.get_serializer(available_slots, many=True)
-        return Response(serializer.data)
+        if not doctor_id or not date_str:
+            return Response({"error": "doctor_id and date are required"}, status=400)
+            
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            doctor = Doctor.objects.get(id=doctor_id)
+            self._generate_slots(doctor, target_date)
+            
+            slots = AppointmentSlot.objects.filter(doctor=doctor, start_time__date=target_date)
+            available_slots = []
+            now = timezone.now()
+            for s in slots:
+                if s.start_time < now: continue
+                if not s.is_booked:
+                    if not s.is_locked() or s.locked_by == request.user:
+                        available_slots.append(s)
+            
+            serializer = self.get_serializer(available_slots, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
 
     @action(detail=False, methods=['get'])
     def all_slots(self, request):
@@ -147,7 +209,10 @@ class AppointmentSlotViewSet(viewsets.ReadOnlyModelViewSet):
             
         try:
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            slots = AppointmentSlot.objects.filter(doctor_id=doctor_id, start_time__date=target_date).order_by('start_time')
+            doctor = Doctor.objects.get(id=doctor_id)
+            self._generate_slots(doctor, target_date)
+            
+            slots = AppointmentSlot.objects.filter(doctor=doctor, start_time__date=target_date).order_by('start_time')
             serializer = self.get_serializer(slots, many=True)
             return Response(serializer.data)
         except Exception as e:
@@ -176,30 +241,30 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.role == 'ADMIN':
-            return Appointment.objects.all()
+            return Appointment.objects.all().order_by('-date')
 
         elif user.role == 'DOCTOR':
             doctor = getattr(user, 'doctor_profile', None)
             if doctor:
-                return Appointment.objects.filter(entity_type='DOCTOR', entity_id=doctor.id)
+                return Appointment.objects.filter(entity_type='DOCTOR', entity_id=doctor.id).order_by('-date')
             return Appointment.objects.none()
 
         elif user.role == 'LAB':
             lab = getattr(user, 'lab_profile', None)
             if lab:
-                return Appointment.objects.filter(entity_type='LAB', entity_id=lab.id)
+                return Appointment.objects.filter(entity_type='LAB', entity_id=lab.id).order_by('-date')
             return Appointment.objects.none()
 
         elif user.role == 'CLINIC':
             try:
                 clinic = Clinic.objects.get(admin_user=user)
                 doctor_ids = Doctor.objects.filter(clinic=clinic).values_list('id', flat=True)
-                return Appointment.objects.filter(entity_type='DOCTOR', entity_id__in=doctor_ids)
+                return Appointment.objects.filter(entity_type='DOCTOR', entity_id__in=doctor_ids).order_by('-date')
             except Exception as e:
                 return Appointment.objects.none()
 
         else:
-            return Appointment.objects.filter(user=user)
+            return Appointment.objects.filter(user=user).order_by('-date')
 
     def create(self, request, *args, **kwargs):
         # Prevent 400 Errors on Retry: Reuse existing pending/unpaid appointment if it exists for this slot and user
@@ -334,6 +399,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                 is_home_collection=is_home_collection,
                 status=initial_status
             )
+
+            # If Pay at Clinic, mark slot as booked immediately
+            if payment_mode == 'PAY_AT_CLINIC' and slot:
+                slot.is_booked = True
+                slot.save()
             
             if test_ids and entity_type == 'LAB':
                 appointment.tests.set(test_ids)

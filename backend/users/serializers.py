@@ -21,10 +21,11 @@ class VerificationDocumentSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     avatar_url = serializers.SerializerMethodField()
     display_name = serializers.SerializerMethodField()
+    facility_details = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'status', 'is_verified', 'first_name', 'last_name', 'phone_number', 'display_name', 'age', 'gender', 'avatar', 'avatar_url']
+        fields = ['id', 'username', 'email', 'role', 'status', 'is_verified', 'first_name', 'last_name', 'phone_number', 'display_name', 'age', 'gender', 'avatar', 'avatar_url', 'facility_details']
 
     def get_avatar_url(self, obj):
         if obj.avatar:
@@ -45,6 +46,15 @@ class UserSerializer(serializers.ModelSerializer):
         # Fallback to standard names
         full_name = f"{obj.first_name} {obj.last_name}".strip()
         return full_name if full_name else obj.username
+
+    def get_facility_details(self, obj):
+        if obj.role == User.Role.CLINIC and hasattr(obj, 'clinic_profile'):
+            p = obj.clinic_profile
+            return {'name': p.name, 'address': p.address, 'pincode': p.pincode, 'city': p.city}
+        elif obj.role == User.Role.LAB and hasattr(obj, 'lab_profile'):
+            p = obj.lab_profile
+            return {'name': p.name, 'address': p.address, 'pincode': p.pincode, 'city': p.city}
+        return None
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -159,7 +169,8 @@ class LabTestSerializer(serializers.ModelSerializer):
             'name': obj.lab.name,
             'address': obj.lab.address,
             'city': obj.lab.city,
-            'home_collection_available': obj.lab.home_collection_available
+            'home_collection_available': obj.lab.home_collection_available,
+            'avatar_url': obj.lab.admin_user.avatar.url if obj.lab.admin_user.avatar else None
         }
 
 class LabSerializer(serializers.ModelSerializer):
@@ -195,12 +206,13 @@ class DoctorSerializer(serializers.ModelSerializer):
     username = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True)
     email = serializers.EmailField(write_only=True, required=False, allow_blank=True)
+    phone_number = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     reviews = FeedbackSerializer(many=True, read_only=True)
 
     class Meta:
         model = Doctor
-        fields = ['id', 'name', 'specialty', 'qualification', 'license_no', 'clinic', 'clinic_id', 'user', 'user_details', 'username', 'password', 'email', 'average_rating', 'rating_count', 'reviews']
+        fields = ['id', 'name', 'specialty', 'qualification', 'license_no', 'clinic', 'clinic_id', 'user', 'user_details', 'username', 'password', 'email', 'phone_number', 'average_rating', 'rating_count', 'reviews']
         read_only_fields = ['user', 'clinic', 'average_rating', 'rating_count']
 
     def validate_username(self, value):
@@ -218,6 +230,7 @@ class DoctorSerializer(serializers.ModelSerializer):
         username = validated_data.pop('username')
         password = validated_data.pop('password')
         email = validated_data.pop('email', '')
+        phone_number = validated_data.pop('phone_number', '')
         
         try:
             with transaction.atomic():
@@ -225,6 +238,7 @@ class DoctorSerializer(serializers.ModelSerializer):
                     username=username,
                     password=password,
                     email=email,
+                    phone_number=phone_number,
                     role=User.Role.DOCTOR,
                     status=User.Status.APPROVED, # automatically approve doctors added by a clinic
                     is_verified=True

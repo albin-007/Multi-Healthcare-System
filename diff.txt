@@ -1,0 +1,340 @@
+﻿diff --git a/frontend/src/pages/Home.jsx b/frontend/src/pages/Home.jsx
+index 969f53c..64e7d3d 100644
+--- a/frontend/src/pages/Home.jsx
++++ b/frontend/src/pages/Home.jsx
+@@ -1,5 +1,6 @@
+ import { Link } from 'react-router-dom';
+-import { motion } from 'framer-motion';
++// eslint-disable-next-line no-unused-vars
++import { motion, AnimatePresence } from 'framer-motion';
+ import { useEffect, useRef, useState, useCallback } from 'react';
+ import Logo from '../components/ui/Logo';
+ import { useAuth } from '../hooks/useAuth';
+@@ -149,7 +150,7 @@ function ProgramsCarousel() {
+                 borderRadius: 24,
+                 overflow: 'hidden',
+                 boxShadow: isActive ? '0 30px 60px rgba(26,60,52,0.25)' : 'none',
+-                background: '#1A3C34',
++                background: '#111111',
+                 border: isActive ? 'none' : '1px solid rgba(26,60,52,0.1)',
+                 display: 'flex',
+                 flexDirection: 'column',
+@@ -235,6 +236,7 @@ const SECTIONS = ['home', 'services', 'features', 'programs', 'about', 'testimon
+ export default function Home() {
+   const { isAuthenticated, userRole } = useAuth();
+   const { containerRef, active, goTo } = useActiveSection(SECTIONS.length);
++  const [showIntro, setShowIntro] = useState(true);
+   
+   // Define dashboard path based on role
+   const getDashboardPath = () => {
+@@ -250,18 +252,86 @@ export default function Home() {
+   return (
+     <>
+       {/* ΓöÇΓöÇ Global Styles ΓöÇΓöÇ */}
++      
++      {/* ΓöÇΓöÇ Intro Overlay ΓöÇΓöÇ */}
++      <AnimatePresence>
++        {showIntro && (
++          <motion.div
++            initial={{ opacity: 1 }}
++            exit={{ opacity: 0, scale: 1.1, filter: 'blur(10px)' }}
++            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
++            style={{
++              position: 'fixed', inset: 0, zIndex: 9999,
++              background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center'
++            }}
++          >
++            <motion.div
++              initial={{ opacity: 0, y: 50 }}
++              animate={{ opacity: 1, y: 0 }}
++              transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
++              style={{
++                width: '90%', maxWidth: 500,
++                background: 'rgba(255,255,255,0.03)',
++                backdropFilter: 'blur(20px)',
++                borderRadius: 32, border: '1px solid rgba(255,255,255,0.08)',
++                padding: 40, textAlign: 'center',
++                boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
++              }}
++            >
++              <motion.div
++                initial={{ scale: 0.9 }}
++                animate={{ scale: 1 }}
++                transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse' }}
++                style={{
++                  width: 140, height: 140, margin: '0 auto 32px', borderRadius: '50%',
++                  background: 'url(/professional_healthcare.png) center/cover',
++                  boxShadow: '0 10px 40px rgba(0,201,177,0.4)', border: '3px solid #00C9B1'
++                }}
++              />
++              <h1 style={{ fontSize: 36, fontWeight: 900, color: 'white', marginBottom: 12, letterSpacing: '-.03em' }}>careConnect</h1>
++              <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', marginBottom: 32, lineHeight: 1.5 }}>
++                Multi-category healthcare platform connecting patients, doctors, clinics, and labs.
++              </p>
++              
++              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 40 }}>
++                {['Appointments', 'Lab Tests', 'Digital Reports'].map((item, i) => (
++                  <span key={i} style={{ fontSize: 12, fontWeight: 700, padding: '8px 16px', background: 'rgba(0,201,177,0.1)', color: '#00C9B1', borderRadius: 999, border: '1px solid rgba(0,201,177,0.2)' }}>{item}</span>
++                ))}
++              </div>
++
++              <button
++                onClick={() => setShowIntro(false)}
++                style={{
++                  width: '100%', padding: '18px', background: 'linear-gradient(135deg, #00C9B1, #008B7A)',
++                  color: 'white', fontWeight: 800, fontSize: 16, borderRadius: 16,
++                  border: 'none', cursor: 'pointer', transition: 'all 0.3s',
++                  boxShadow: '0 10px 20px rgba(0,201,177,0.3)'
++                }}
++                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 15px 30px rgba(0,201,177,0.4)' }}
++                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,201,177,0.3)' }}
++              >
++                Enter Platform
++              </button>
++            </motion.div>
++          </motion.div>
++        )}
++      </AnimatePresence>
++
++      <div style={{ filter: showIntro ? 'blur(10px)' : 'none', opacity: showIntro ? 0.5 : 1, transition: 'all 0.8s ease' }}>
++
+       <style>{`
+         @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap');
+ 
+         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+ 
+         :root {
+-          --dg:      #1A3C34;
+-          --dg-mid:  #2D5748;
+-          --dg-lite: #3D7A68;
+-          --cream:   #F5F2ED;
+-          --grey:    #B0BAC6;
+-          --grey-lt: #E2E6ED;
++          --dg:      #0A0A0A;
++          --dg-mid:  #141414;
++          --dg-lite: #222222;
++          --cream:   #0A0A0A;
++          --grey:    #333333;
++          --grey-lt: #1A1A1A;
++          --teal-accent: #00C9B1;
+         }
+ 
+         /* ΓöÇΓöÇ Scrollable container ΓöÇΓöÇ */
+@@ -627,13 +697,13 @@ export default function Home() {
+         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+         padding: '14px 48px',
+-        background: active === 0 ? 'transparent' : 'rgba(245,242,237,0.92)',
++        background: active === 0 ? 'transparent' : 'rgba(10,10,10,0.92)',
+         backdropFilter: active === 0 ? 'none' : 'blur(20px)',
+         borderBottom: active === 0 ? 'none' : '1px solid rgba(26,60,52,0.08)',
+         transition: 'all .35s ease',
+       }}>
+         <Link to="/" style={{ textDecoration: 'none' }}>
+-          <Logo size="md" variant="dark" />
++          <Logo size="md" variant="light" />
+         </Link>
+ 
+         {/* Desktop nav links */}
+@@ -645,9 +715,9 @@ export default function Home() {
+               style={{
+                 background: 'none', border: 'none', cursor: 'pointer',
+                 fontSize: 14, fontWeight: 600, letterSpacing: '.01em',
+-                color: active === i ? '#1A3C34' : 'rgba(26,60,52,0.55)',
++                color: active === i ? '#00C9B1' : 'rgba(255,255,255,0.55)',
+                 textTransform: 'capitalize',
+-                borderBottom: active === i ? '2px solid #1A3C34' : '2px solid transparent',
++                borderBottom: active === i ? '2px solid #00C9B1' : '2px solid transparent',
+                 paddingBottom: 2, transition: 'all .2s',
+               }}
+             >
+@@ -692,7 +762,7 @@ export default function Home() {
+       <div id="snap-container" ref={containerRef}>
+ 
+         {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ PAGE 1 ΓÇö HERO ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
+-        <Page id="home" bg="linear-gradient(160deg, #F5F2ED 0%, #E6EFE9 45%, #F5F2ED 100%)">
++        <Page id="home" bg="linear-gradient(160deg, #050505 0%, #111111 45%, #050505 100%)">
+           {/* dot-grid bg */}
+           <div style={{
+             position: 'absolute', inset: 0, opacity: .18,
+@@ -712,7 +782,7 @@ export default function Home() {
+             {/* LEFT */}
+             <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+ 
+-              <div className="anim-fadeUp pill" style={{ background: 'rgba(26,60,52,0.07)', border: '1px solid rgba(26,60,52,0.12)', color: '#1A3C34', width: 'fit-content' }}>
++              <div className="anim-fadeUp pill" style={{ background: 'rgba(0,201,177,0.1)', border: '1px solid rgba(26,60,52,0.12)', color: 'white', width: 'fit-content' }}>
+                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3D7A68', display: 'inline-block', position: 'relative' }}>
+                   <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#3D7A68', animation: 'ping 1.5s cubic-bezier(0,0,.2,1) infinite' }} />
+                 </span>
+@@ -720,18 +790,18 @@ export default function Home() {
+               </div>
+ 
+               <div className="anim-fadeUp d1">
+-                <h1 style={{ fontSize: 'clamp(48px,5vw,72px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-.03em', color: '#1A3C34' }}>
++                <h1 style={{ fontSize: 'clamp(48px,5vw,72px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-.03em', color: 'white' }}>
+                   careN
+                 </h1>
+                 <h1 className="shimmer-gold" style={{ fontSize: 'clamp(48px,5vw,72px)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-.03em' }}>
+                   connect
+                 </h1>
+-                <p style={{ fontSize: 'clamp(20px,2vw,28px)', fontWeight: 700, color: 'rgba(26,60,52,0.45)', marginTop: 12, letterSpacing: '-.01em' }}>
+-                  Multi-Category <span style={{ color: '#1A3C34' }}>Healthcare Setup</span>
++                <p style={{ fontSize: 'clamp(20px,2vw,28px)', fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginTop: 12, letterSpacing: '-.01em' }}>
++                  Multi-Category <span style={{ color: 'white' }}>Healthcare Setup</span>
+                 </p>
+               </div>
+ 
+-              <p className="anim-fadeUp d2" style={{ fontSize: 17, lineHeight: 1.7, color: '#4A6A60', maxWidth: 420 }}>
++              <p className="anim-fadeUp d2" style={{ fontSize: 17, lineHeight: 1.7, color: 'rgba(255,255,255,0.6)', maxWidth: 420 }}>
+                 Book appointments at top-tier clinics, doctors, and diagnostic labs ΓÇö all from one simple platform.
+               </p>
+ 
+@@ -747,10 +817,10 @@ export default function Home() {
+               <div className="anim-fadeUp d4" style={{ display: 'flex', gap: 32, paddingTop: 16, borderTop: '1px solid rgba(26,60,52,0.1)' }}>
+                 {[['Verified', 'Partners'], ['Instant', 'Sync'], ['Secured', 'Data']].map(([v, l]) => (
+                   <div key={l}>
+-                    <div style={{ fontSize: 22, fontWeight: 900, color: '#1A3C34', display: 'flex', alignItems: 'center', gap: 6 }}>
++                    <div style={{ fontSize: 22, fontWeight: 900, color: 'white', display: 'flex', alignItems: 'center', gap: 6 }}>
+                       <CheckCircle size={16} color="#3D7A68" /> {v}
+                     </div>
+-                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: '#7A9E94', textTransform: 'uppercase' }}>{l}</div>
++                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', color: '#00C9B1', textTransform: 'uppercase' }}>{l}</div>
+                   </div>
+                 ))}
+               </div>
+@@ -787,7 +857,7 @@ export default function Home() {
+                 />
+ 
+                 <div className="glass" style={{ position: 'absolute', top: 24, left: 24, padding: '10px 18px', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 16 }}>
+-                  <Logo size="sm" variant="dark" />
++                  <Logo size="sm" variant="light" />
+                 </div>
+ 
+                 {/* Active Session chip */}
+@@ -823,13 +893,13 @@ export default function Home() {
+         </Page>
+ 
+         {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ PAGE 2 ΓÇö SERVICES ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
+-        <Page id="services" bg="#F5F2ED">
++        <Page id="services" bg="#0A0A0A">
+           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 48px 60px', maxWidth: 1100, margin: '0 auto' }}>
+             <Reveal>
+               <div style={{ textAlign: 'center', marginBottom: 48 }}>
+                 <div className="divider" style={{ margin: '0 auto 14px' }} />
+-                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.15em', color: '#3D7A68', textTransform: 'uppercase' }}>What We Offer</span>
+-                <h2 style={{ fontSize: 'clamp(28px,3.2vw,44px)', fontWeight: 900, color: '#1A3C34', marginTop: 14, letterSpacing: '-.02em' }}>
++                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.15em', color: '#00C9B1', textTransform: 'uppercase' }}>What We Offer</span>
++                <h2 style={{ fontSize: 'clamp(28px,3.2vw,44px)', fontWeight: 900, color: 'white', marginTop: 14, letterSpacing: '-.02em' }}>
+                   All Healthcare, <span style={{ color: 'transparent', WebkitTextFillColor: 'transparent', WebkitBackgroundClip: 'text', backgroundImage: 'linear-gradient(135deg, #1A3C34 0%, #00C2A8 100%)' }}>One Platform.</span>
+                 </h2>
+               </div>
+@@ -840,6 +910,7 @@ export default function Home() {
+                   { icon: Building2, title: 'Clinics', desc: 'Instant access to verified multi-specialty clinics. Book, manage, and track your consultations in real-time.', cta: 'Book Clinic', img: '/service_clinic.png', link: '/find-clinics' },
+                   { icon: Stethoscope, title: 'Specialist Doctors', desc: 'Board-certified doctors across 40+ specialties. View profiles, ratings, and availability in seconds.', cta: 'Find Doctor', img: '/service_doctor.png', link: '/find-doctors' },
+                   { icon: ActivitySquare, title: 'Diagnostic Labs', desc: 'Schedule lab tests online, receive digital results straight to your secure patient portal.', cta: 'Book Lab Test', img: '/service_lab.png', link: '/find-tests' },
++                // eslint-disable-next-line no-unused-vars
+                 ].map(({ icon: Icon, title, desc, cta, img, link }, i) => (
+                   <motion.div
+                     key={title}
+@@ -883,7 +954,7 @@ export default function Home() {
+                             <span style={{ fontSize: 9, fontWeight: 800, color: '#00C2A8', letterSpacing: '.15em', textTransform: 'uppercase' }}>Verified Service</span>
+                           </div>
+                           
+-                          <h3 className="svc-title" style={{ fontSize: 22, fontWeight: 900, color: '#F5F2ED', marginBottom: 14, letterSpacing: '-.02em', transition: 'color 0.3s' }}>{title}</h3>
++                          <h3 className="svc-title" style={{ fontSize: 22, fontWeight: 900, color: 'white', marginBottom: 14, letterSpacing: '-.02em', transition: 'color 0.3s' }}>{title}</h3>
+                           <p className="svc-desc" style={{ fontSize: 13, lineHeight: 1.6, color: 'rgba(245,242,237,0.65)', marginBottom: 28, flex: 1, transition: 'color 0.3s' }}>{desc}</p>
+                           
+                           <div className="svc-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, color: '#00C2A8', textTransform: 'uppercase', letterSpacing: '.1em', transition: 'color 0.3s' }}>
+@@ -965,13 +1036,13 @@ export default function Home() {
+         </Page>
+ 
+         {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ PAGE 3.5 ΓÇö PROGRAMS ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
+-        <Page id="programs" bg="#F5F2ED">
++        <Page id="programs" bg="#0A0A0A">
+           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 20px 40px', maxWidth: 1280, margin: '0 auto', position: 'relative' }}>
+             <Reveal>
+               <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                 <div className="divider" style={{ margin: '0 auto 14px' }} />
+-                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.15em', color: '#3D7A68', textTransform: 'uppercase' }}>Wellness Guide</span>
+-                <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 42px)', fontWeight: 800, color: '#1A3C34', marginTop: 12, letterSpacing: '-.02em', lineHeight: 1.2 }}>
++                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.15em', color: '#00C9B1', textTransform: 'uppercase' }}>Wellness Guide</span>
++                <h2 style={{ fontSize: 'clamp(26px, 3.5vw, 42px)', fontWeight: 800, color: 'white', marginTop: 12, letterSpacing: '-.02em', lineHeight: 1.2 }}>
+                   Essential <span style={{ color: 'transparent', WebkitTextFillColor: 'transparent', WebkitBackgroundClip: 'text', backgroundImage: 'linear-gradient(135deg, #1A3C34 0%, #00C2A8 100%)' }}>Health Insights</span> <span style={{ fontWeight: 400, color: '#5A7A70' }}>& Tips</span>
+                 </h2>
+               </div>
+@@ -1075,6 +1146,7 @@ export default function Home() {
+                 {[
+                   { icon: ActivitySquare, t: 'High-Fidelity Interaction', d: 'An interface designed for precision and clarity in every medical transaction.' },
+                   { icon: ShieldCheck, t: 'Encryption Standard', d: 'Every appointment and record is secured within a private, AES-256 encrypted node.' },
++                // eslint-disable-next-line no-unused-vars
+                 ].map(({ icon: Icon, t, d }, i) => (
+                   <Reveal key={t} delay={i === 0 ? 'd1' : 'd2'}>
+                     <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
+@@ -1105,13 +1177,13 @@ export default function Home() {
+         </Page>
+ 
+         {/* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ PAGE 4 ΓÇö TESTIMONIALS ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */}
+-        <Page id="testimonials" bg="#F5F2ED">
++        <Page id="testimonials" bg="#0A0A0A">
+           <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 64px 60px', maxWidth: 1280, margin: '0 auto' }}>
+             <Reveal>
+               <div style={{ textAlign: 'center', marginBottom: 48 }}>
+                 <div className="divider" style={{ margin: '0 auto 14px' }} />
+-                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.15em', color: '#3D7A68', textTransform: 'uppercase' }}>What People Say</span>
+-                <h2 style={{ fontSize: 'clamp(32px,4vw,52px)', fontWeight: 900, color: '#1A3C34', marginTop: 10, letterSpacing: '-.02em' }}>
++                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.15em', color: '#00C9B1', textTransform: 'uppercase' }}>What People Say</span>
++                <h2 style={{ fontSize: 'clamp(32px,4vw,52px)', fontWeight: 900, color: 'white', marginTop: 10, letterSpacing: '-.02em' }}>
+                   Trusted by many
+                 </h2>
+               </div>
+@@ -1131,7 +1203,7 @@ export default function Home() {
+                   name: 'MedWell Clinic', role: 'Partner Clinic', avatar: 'C',
+                   text: 'Our patient management improved by 40% after joining careNconnect. Highly recommended!', stars: 5
+                 },
+-              ].map(({ name, role, avatar, text, stars }, i) => (
++              ].map(({ name, role, text, stars }, i) => (
+                 <Reveal key={name} delay={i === 0 ? '' : i === 1 ? 'd2' : 'd4'}>
+                   <div className="testi-card" style={{ padding: 32, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                     <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+@@ -1147,8 +1219,8 @@ export default function Home() {
+                         alt={name}
+                       />
+                       <div>
+-                        <div style={{ fontSize: 14, fontWeight: 800, color: '#1A3C34' }}>{name}</div>
+-                        <div style={{ fontSize: 12, color: '#7A9E94' }}>{role}</div>
++                        <div style={{ fontSize: 14, fontWeight: 800, color: 'white' }}>{name}</div>
++                        <div style={{ fontSize: 12, color: '#00C9B1' }}>{role}</div>
+                       </div>
+                     </div>
+                   </div>
+@@ -1223,7 +1295,7 @@ export default function Home() {
+ 
+               <Reveal>
+                 <div>
+-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', color: '#3D7A68', textTransform: 'uppercase', marginBottom: 16 }}>Navigation</div>
++                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', color: '#00C9B1', textTransform: 'uppercase', marginBottom: 16 }}>Navigation</div>
+                   {['Home', 'Services', 'About', 'Contact'].map(l => (
+                     <div key={l} style={{ marginBottom: 10 }}>
+                       <a href={`#${l.toLowerCase()}`} style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', textDecoration: 'none', transition: 'color .2s', fontWeight: 500 }}
+@@ -1237,11 +1309,12 @@ export default function Home() {
+ 
+               <Reveal>
+                 <div>
+-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', color: '#3D7A68', textTransform: 'uppercase', marginBottom: 16 }}>Contact</div>
++                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', color: '#00C9B1', textTransform: 'uppercase', marginBottom: 16 }}>Contact</div>
+                   {[
+                     { Icon: Mail, text: 'support@carenconnect.com' },
+                     { Icon: Phone, text: '8848485663' },
+                     { Icon: MapPin, text: 'Kerala, Kollam' },
++                  // eslint-disable-next-line no-unused-vars
+                   ].map(({ Icon, text }) => (
+                     <div key={text} style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'flex-start' }}>
+                       <Icon size={14} color="#3D7A68" style={{ marginTop: 1, flexShrink: 0 }} />
+@@ -1263,6 +1336,7 @@ export default function Home() {
+         </Page>
+ 
+       </div>{/* end snap-container */}
++      </div>
+     </>
+   );
+ }

@@ -24,7 +24,7 @@ import { ThemeProvider } from './context/ThemeContext';
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, userRole } = useAuth();
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/" replace />;
   
   if (allowedRoles && !allowedRoles.includes(userRole)) {
     return <Navigate to="/unauthorized" replace />;
@@ -34,7 +34,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 };
 
 function App() {
-  const { isAuthenticated, userRole } = useAuth();
+  const { userRole } = useAuth();
 
   return (
     <ThemeProvider>

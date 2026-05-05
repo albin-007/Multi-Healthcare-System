@@ -199,7 +199,7 @@ const FindDoctors = () => {
                       <div className="flex items-center gap-4 mb-4">
                         <div className="relative">
                           <img 
-                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${doc.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                            src={doc.user_details?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${doc.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
                             className="w-16 h-16 rounded-2xl border-2 border-white shadow-md object-cover" 
                             alt={doc.name} 
                           />
@@ -227,6 +227,12 @@ const FindDoctors = () => {
                           <span className="font-bold">4.9</span>
                           <span className="opacity-50">(120+ reviews)</span>
                         </div>
+                        {doc.user_details?.phone_number && (
+                          <div className="flex items-center gap-2 text-xs text-[#5A7A70]">
+                            <Phone size={14} className="text-[#1A3C34]" />
+                            <span className="font-bold tabular-nums">{doc.user_details.phone_number}</span>
+                          </div>
+                        )}
                       </div>
 
                       <Link 

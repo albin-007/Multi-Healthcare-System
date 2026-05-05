@@ -24,6 +24,26 @@ class DoctorAvailability(models.Model):
     def __str__(self):
         return f"{self.doctor.name} - {self.get_day_of_week_display()} ({self.start_time} - {self.end_time})"
 
+class DoctorBreak(models.Model):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='breaks')
+    day_of_week = models.IntegerField(choices=DoctorAvailability.DayOfWeek.choices)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    def __str__(self):
+        return f"Break for {self.doctor.name} on {self.get_day_of_week_display()}"
+
+class DoctorLeave(models.Model):
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='leaves')
+    date = models.DateField()
+    reason = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        unique_together = ('doctor', 'date')
+
+    def __str__(self):
+        return f"Leave for {self.doctor.name} on {self.date}"
+
 class LabAvailability(models.Model):
     class DayOfWeek(models.IntegerChoices):
         MONDAY = 0, "Monday"

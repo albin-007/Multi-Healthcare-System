@@ -2,10 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { 
-  FileText, Download, Printer, ArrowLeft, CheckCircle2, 
-  Activity, Calendar, User, ShieldCheck, Mail, Phone, MapPin 
+  FileText, Download, Printer, ArrowLeft, CheckCircle2,
+  Activity, Calendar, User, ShieldCheck, Mail, Phone, MapPin, ExternalLink,
+  FlaskConical, Stethoscope, AlertCircle, Trash2, CheckCircle, Info
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function MedicalReport() {
   const { type, id } = useParams();
@@ -37,6 +40,32 @@ export default function MedicalReport() {
   const handlePrint = () => {
     window.print();
   };
+  
+  const handleDownloadPDF = async () => {
+    const element = reportRef.current;
+    if (!element) return;
+    
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Medical_Report_${type}_${id}.pdf`);
+    } catch (error) {
+      console.error('PDF Generation Error:', error);
+      alert('Failed to generate PDF report.');
+    }
+  };
 
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-slate-50">
@@ -64,6 +93,30 @@ export default function MedicalReport() {
 
   const patient = data.patient || {};
   const provider = type === 'prescription' ? (data.doctor || {}) : (data.lab || {});
+  
+  // Extract specific details for Lab/Clinic
+  const facility = type === 'prescription' ? provider.clinic : (provider.facility_details || {});
+  const licenseNo = type === 'prescription' ? provider.license_no : provider.facility_details?.license_no;
+
+  // Helper to parse result data into structured rows if possible
+  const parseResults = (text) => {
+    if (!text) return [];
+    // Try to split by lines and then by colon
+    return text.split('\n').map(line => {
+      const parts = line.split(':');
+      if (parts.length >= 2) {
+        return {
+          parameter: parts[0].trim(),
+          value: parts[1].trim(),
+          unit: parts[2]?.trim() || '—',
+          refRange: parts[3]?.trim() || 'Normal'
+        };
+      }
+      return null;
+    }).filter(Boolean);
+  };
+
+  const structuredResults = type === 'lab-test' ? parseResults(data.result_data) : [];
 
   return (
     <div className="min-h-screen bg-slate-100 py-10 px-4 print:p-0 print:bg-white">
@@ -73,10 +126,22 @@ export default function MedicalReport() {
           <ArrowLeft className="w-4 h-4" /> Back to Records
         </Button>
         <div className="flex gap-3">
+          {type === 'lab-test' && data.file_url && (
+            <Button 
+              variant="outline" 
+              onClick={() => window.open(data.file_url, '_blank')}
+              className="gap-2 bg-white font-bold border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+            >
+              <ExternalLink className="w-4 h-4" /> Original File
+            </Button>
+          )}
           <Button variant="outline" onClick={handlePrint} className="gap-2 bg-white font-bold border-slate-200">
             <Printer className="w-4 h-4" /> Print Report
           </Button>
-          <Button className="gap-2 bg-brand-600 hover:bg-brand-700 text-white font-black shadow-lg shadow-brand-500/20">
+          <Button 
+            onClick={handleDownloadPDF}
+            className="gap-2 bg-brand-600 hover:bg-brand-700 text-white font-black shadow-lg shadow-brand-500/20"
+          >
             <Download className="w-4 h-4" /> Digital PDF
           </Button>
         </div>
@@ -95,17 +160,37 @@ export default function MedicalReport() {
           <div className="flex flex-col md:flex-row justify-between items-start gap-8">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center text-white shadow-lg">
-                  <Activity className="w-7 h-7" />
+                <div className="w-14 h-14 rounded-2xl bg-brand-600 flex items-center justify-center text-white shadow-xl group-hover:scale-105 transition-transform">
+                  {type === 'lab-test' ? <FlaskConical className="w-8 h-8" /> : <Activity className="w-8 h-8" />}
                 </div>
                 <div>
-                  <h1 className="text-3xl font-black text-slate-900 tracking-tight">careNconnect</h1>
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-600">Unified Medical Portal</p>
+                  <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                    {facility?.name || 'careNconnect Hub'}
+                  </h1>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-600 mt-2">
+                    {type === 'lab-test' ? 'Certified Diagnostic Laboratory' : 'Authorized Medical Clinic'}
+                  </p>
                 </div>
               </div>
-              <div className="text-sm text-slate-500 font-medium space-y-1">
-                <p className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" /> Licensed healthcare provider network</p>
-                <p className="flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> Encrypted Digital Health Record</p>
+              <div className="text-xs text-slate-500 font-bold space-y-1.5 pl-1">
+                <p className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-brand-500" /> 
+                  {facility?.address}, {facility?.city || ''} {facility?.pincode || ''}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-brand-500" /> 
+                  {provider.phone_number || '+91-XXXXXXXXXX'}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 text-brand-500" /> 
+                  {provider.email || 'contact@medical-portal.com'}
+                </p>
+                {licenseNo && (
+                  <p className="flex items-center gap-2 text-slate-400">
+                    <ShieldCheck className="w-3.5 h-3.5" /> 
+                    Govt. License №: {licenseNo}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -123,72 +208,151 @@ export default function MedicalReport() {
                   </div>
                   <div className="flex gap-8 justify-between">
                     <span className="text-[10px] font-black text-slate-400">TYPE</span>
-                    <span className="text-xs font-black text-brand-600 uppercase tracking-widest">{type}</span>
+                    <span className="text-xs font-black text-brand-600 uppercase tracking-widest">{type.replace('-', ' ')}</span>
                   </div>
+                  <div className="flex gap-8 justify-between">
+                    <span className="text-[10px] font-black text-slate-400">STATUS</span>
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${data.is_normal ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {data.is_normal ? 'Normal' : 'Attention Required'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Barcode Visual */}
+                <div className="mt-6 flex flex-col items-center opacity-30">
+                  <div className="h-8 w-full flex gap-[1px]">
+                    {[...Array(40)].map((_, i) => (
+                      <div key={i} className={`h-full ${Math.random() > 0.3 ? 'bg-black' : 'bg-transparent'}`} style={{ width: `${Math.random() * 3 + 1}px` }} />
+                    ))}
+                  </div>
+                  <p className="text-[8px] font-mono mt-1">CRT-{id.padStart(8, '0')}-AUTH</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 border-y border-slate-100 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 border-y border-slate-100 py-12 bg-slate-50/50 px-12 -mx-12">
             {/* Patient Info */}
             <div className="space-y-6">
               <div className="flex items-center gap-3">
-                <img 
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${patient.username || 'Patient'}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                  className="w-8 h-8 rounded-xl border border-slate-100 shadow-sm"
-                  alt="Patient"
-                />
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Patient Information</h3>
+                <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-600">
+                  <User className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Patient Profile</h3>
               </div>
-              <div className="space-y-1 pl-11">
-                <p className="text-xl font-black text-slate-900">{patient.first_name || patient.username} {patient.last_name || ''}</p>
-                <div className="space-y-2 pt-2">
-                   <p className="text-xs font-bold text-slate-500 flex items-center gap-2"><Mail className="w-3.5 h-3.5" /> {patient.email || '—'}</p>
-                   <p className="text-xs font-bold text-slate-500 flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> PID-{patient.id}</p>
+              <div className="grid grid-cols-2 gap-y-4 gap-x-8">
+                <div className="col-span-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Full Name</p>
+                  <p className="text-lg font-black text-slate-900">{patient.first_name || patient.username} {patient.last_name || ''}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Age / Gender</p>
+                  <p className="text-sm font-bold text-slate-900">{patient.age || '—'} Yrs / {patient.gender || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Patient ID</p>
+                  <p className="text-sm font-bold text-brand-600">PID-{patient.id}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contact</p>
+                  <p className="text-sm font-bold text-slate-900">{patient.email || '—'}</p>
                 </div>
               </div>
             </div>
 
             {/* Provider Info */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 md:justify-end">
-                <img 
-                  src={`https://api.dicebear.com/7.x/${type === 'prescription' ? 'avataaars' : 'shapes'}/svg?seed=${provider.name || provider.username || 'Authority'}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                  className="w-8 h-8 rounded-xl border border-slate-100 shadow-sm"
-                  alt="Authority"
-                />
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Medical Authority</h3>
-              </div>
-              <div className="space-y-1 md:text-right md:pr-11">
-                <p className="text-xl font-black text-slate-900">{type === 'prescription' ? `Dr. ${(provider.name || '').replace(/^Dr\.?\s*/i, '').trim()}` : provider.name || provider.username}</p>
-                <div className="space-y-2 pt-2 md:flex md:flex-col md:items-end">
-                   <p className="text-xs font-bold text-slate-500">{provider.specialty || (type === 'lab' ? 'Diagnostic Center' : 'Specialist')}</p>
-                   {provider.license_no && <p className="text-[10px] font-black uppercase text-slate-400 tracking-tighter">LIC: {provider.license_no}</p>}
+            <div className="space-y-6 md:border-l md:border-slate-100 md:pl-12">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                  <Stethoscope className="w-5 h-5" />
                 </div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Referred By</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Attending Authority</p>
+                  <p className="text-lg font-black text-slate-900">
+                    {type === 'prescription' ? `Dr. ${(provider.name || '').replace(/^Dr\.?\s*/i, '').trim()}` : (data.appointment?.test_request_details?.doctor_name || 'Self-Referred')}
+                  </p>
+                  <p className="text-xs font-bold text-slate-500 mt-1">
+                    {type === 'prescription' ? provider.specialty : 'Verified Physician'}
+                  </p>
+                </div>
+                {type === 'lab-test' && (
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Reporting Officer</p>
+                    <p className="text-sm font-bold text-slate-900">{provider.name || 'Laboratory Pathologist'}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Report Content */}
           <div className="space-y-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                <FileText className="w-5 h-5" />
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Diagnostic Report Summary</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Clinical Observation Details</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-900 tracking-tight">Findings & Recommendations</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Clinical Observation Summary</p>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Department</p>
+                <p className="text-xs font-bold text-slate-900">{type === 'lab-test' ? 'Clinical Biochemistry' : 'General Medicine'}</p>
               </div>
             </div>
 
-            <div className="bg-slate-50 rounded-[2rem] p-10 border border-slate-100 min-h-[200px]">
-              <div className="prose prose-slate max-w-none">
-                <p className="text-slate-700 font-medium leading-relaxed whitespace-pre-line">
-                  {type === 'prescription' ? data.notes : data.result_data}
-                </p>
+            {type === 'lab-test' && structuredResults.length > 0 ? (
+              <div className="overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                      <th className="px-6 py-4">Investigation</th>
+                      <th className="px-6 py-4">Observed Value</th>
+                      <th className="px-6 py-4">Unit</th>
+                      <th className="px-6 py-4">Biological Ref Range</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {structuredResults.map((res, i) => (
+                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-5 text-sm font-bold text-slate-900">{res.parameter}</td>
+                        <td className="px-6 py-5 text-sm font-black text-brand-700">{res.value}</td>
+                        <td className="px-6 py-5 text-xs font-bold text-slate-500 italic">{res.unit}</td>
+                        <td className="px-6 py-5 text-xs font-medium text-slate-400">{res.refRange}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            ) : (
+              <div className="bg-slate-50 rounded-[2rem] p-10 border border-slate-100 min-h-[200px] relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-[0.03]">
+                  <Activity className="w-48 h-48" />
+                </div>
+                <div className="prose prose-slate max-w-none relative z-10">
+                  <p className="text-slate-700 font-medium leading-relaxed whitespace-pre-line text-sm">
+                    {type === 'prescription' ? data.notes : data.result_data}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {type === 'lab-test' && (
+              <div className="p-6 bg-brand-50/50 rounded-2xl border border-brand-100 flex items-start gap-4">
+                <AlertCircle className="w-5 h-5 text-brand-600 mt-0.5" />
+                <div>
+                  <p className="text-xs font-black text-slate-900 uppercase tracking-wide">Clinical Interpretation</p>
+                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                    The results presented above reflect the sample collected and processed under standard laboratory protocols. 
+                    Please correlate these findings with clinical symptoms and consult your healthcare provider for definitive diagnosis.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Verification Footer */}

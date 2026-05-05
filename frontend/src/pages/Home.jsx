@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useEffect, useRef, useState, useCallback } from 'react';
+
+// eslint-disable-next-line no-unused-vars
+import { motion } from 'framer-motion';
 import Logo from '../components/ui/Logo';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -235,10 +237,10 @@ const SECTIONS = ['home', 'services', 'features', 'programs', 'about', 'testimon
 export default function Home() {
   const { isAuthenticated, userRole } = useAuth();
   const { containerRef, active, goTo } = useActiveSection(SECTIONS.length);
-  
+
   // Define dashboard path based on role
   const getDashboardPath = () => {
-    switch(userRole) {
+    switch (userRole) {
       case 'ADMIN': return '/admin';
       case 'CLINIC': return '/clinic';
       case 'DOCTOR': return '/doctor';
@@ -781,14 +783,12 @@ export default function Home() {
               >
                 {/* Generated Real-World Healthcare Image */}
                 <img
-                  src="/professional_healthcare.png"
+                  src="/green_white_doctor.png"
                   alt="careNconnect Clinic"
                   style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 1 }}
                 />
 
-                <div className="glass" style={{ position: 'absolute', top: 24, left: 24, padding: '10px 18px', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 16 }}>
-                  <Logo size="sm" variant="dark" />
-                </div>
+
 
                 {/* Active Session chip */}
                 <div style={{ position: 'absolute', top: 24, right: 24, padding: '6px 14px', background: 'rgba(26,60,52,0.85)', backdropFilter: 'blur(8px)', borderRadius: 999, display: 'flex', alignItems: 'center', gap: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -836,64 +836,65 @@ export default function Home() {
             </Reveal>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24 }}>
-                {[
-                  { icon: Building2, title: 'Clinics', desc: 'Instant access to verified multi-specialty clinics. Book, manage, and track your consultations in real-time.', cta: 'Book Clinic', img: '/service_clinic.png', link: '/find-clinics' },
-                  { icon: Stethoscope, title: 'Specialist Doctors', desc: 'Board-certified doctors across 40+ specialties. View profiles, ratings, and availability in seconds.', cta: 'Find Doctor', img: '/service_doctor.png', link: '/find-doctors' },
-                  { icon: ActivitySquare, title: 'Diagnostic Labs', desc: 'Schedule lab tests online, receive digital results straight to your secure patient portal.', cta: 'Book Lab Test', img: '/service_lab.png', link: '/find-tests' },
-                ].map(({ icon: Icon, title, desc, cta, img, link }, i) => (
-                  <motion.div
-                    key={title}
-                    initial={{ 
-                      opacity: 0, 
-                      x: i === 0 ? -100 : (i === 2 ? 100 : 0), 
-                      y: i === 1 ? 100 : 0 
-                    }}
-                    whileInView={{ opacity: 1, x: 0, y: 0 }}
-                    viewport={{ once: true, margin: "-100px" }}
-                    transition={{ duration: 1, delay: i * 0.2, ease: [0.21, 1.11, 0.81, 0.99] }}
-                    style={{ height: '100%' }}
+              {[
+                { icon: Building2, title: 'Clinics', desc: 'Instant access to verified multi-specialty clinics. Book, manage, and track your consultations in real-time.', cta: 'Book Clinic', img: '/green_white_clinic.png', link: '/find-clinics' },
+                { icon: Stethoscope, title: 'Specialist Doctors', desc: 'Board-certified doctors across 40+ specialties. View profiles, ratings, and availability in seconds.', cta: 'Find Doctor', img: '/green_white_patient.png', link: '/find-doctors' },
+                { icon: ActivitySquare, title: 'Diagnostic Labs', desc: 'Schedule lab tests online, receive digital results straight to your secure patient portal.', cta: 'Book Lab Test', img: '/green_white_lab.png', link: '/find-tests' },
+                // eslint-disable-next-line no-unused-vars
+              ].map(({ icon: Icon, title, desc, cta, img, link }, i) => (
+                <motion.div
+                  key={title}
+                  initial={{
+                    opacity: 0,
+                    x: i === 0 ? -100 : (i === 2 ? 100 : 0),
+                    y: i === 1 ? 100 : 0
+                  }}
+                  whileInView={{ opacity: 1, x: 0, y: 0 }}
+                  viewport={{ once: true, margin: "-100px" }}
+                  transition={{ duration: 1, delay: i * 0.2, ease: [0.21, 1.11, 0.81, 0.99] }}
+                  style={{ height: '100%' }}
+                >
+                  <Link
+                    to={link}
+                    style={{ textDecoration: 'none', display: 'block', height: '100%' }}
                   >
-                    <Link 
-                      to={link} 
-                      style={{ textDecoration: 'none', display: 'block', height: '100%' }}
-                    >
-                      <div className="svc-card" style={{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column', border: '1px solid rgba(26,60,52,0.1)', boxShadow: '0 10px 30px rgba(26,60,52,0.04)' }}>
-                        <div style={{ height: 180, width: '100%', overflow: 'hidden', position: 'relative' }}>
-                          <img 
-                            src={img} 
-                            alt={title} 
-                            className="svc-img" 
-                            style={{ 
-                              width: '100%', 
-                              height: '100%', 
-                              objectFit: 'cover', 
-                              objectPosition: title.includes('Doctors') ? 'top center' : 'center',
-                              transition: 'transform 0.8s' 
-                            }} 
-                          />
-                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(26,60,52,0.05) 100%)' }} />
-                          <div className="svc-icon-wrap" style={{ position: 'absolute', top: 16, right: 16, width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px rgba(0,0,0,0.1)', transition: 'all 0.3s' }}>
-                            <Icon size={20} className="svc-icon" color="#3D7A68" />
-                          </div>
-                        </div>
-
-                        <div style={{ padding: '28px 32px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00C2A8' }} />
-                            <span style={{ fontSize: 9, fontWeight: 800, color: '#00C2A8', letterSpacing: '.15em', textTransform: 'uppercase' }}>Verified Service</span>
-                          </div>
-                          
-                          <h3 className="svc-title" style={{ fontSize: 22, fontWeight: 900, color: '#F5F2ED', marginBottom: 14, letterSpacing: '-.02em', transition: 'color 0.3s' }}>{title}</h3>
-                          <p className="svc-desc" style={{ fontSize: 13, lineHeight: 1.6, color: 'rgba(245,242,237,0.65)', marginBottom: 28, flex: 1, transition: 'color 0.3s' }}>{desc}</p>
-                          
-                          <div className="svc-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, color: '#00C2A8', textTransform: 'uppercase', letterSpacing: '.1em', transition: 'color 0.3s' }}>
-                            {cta} <ArrowRight size={14} className="svc-arrow" style={{ transition: 'transform 0.3s' }} />
-                          </div>
+                    <div className="svc-card" style={{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column', border: '1px solid rgba(26,60,52,0.1)', boxShadow: '0 10px 30px rgba(26,60,52,0.04)' }}>
+                      <div style={{ height: 180, width: '100%', overflow: 'hidden', position: 'relative' }}>
+                        <img
+                          src={img}
+                          alt={title}
+                          className="svc-img"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: title.includes('Doctors') ? 'top center' : 'center',
+                            transition: 'transform 0.8s'
+                          }}
+                        />
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 50%, rgba(26,60,52,0.05) 100%)' }} />
+                        <div className="svc-icon-wrap" style={{ position: 'absolute', top: 16, right: 16, width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px rgba(0,0,0,0.1)', transition: 'all 0.3s' }}>
+                          <Icon size={20} className="svc-icon" color="#3D7A68" />
                         </div>
                       </div>
-                    </Link>
-                  </motion.div>
-                ))}
+
+                      <div style={{ padding: '28px 32px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00C2A8' }} />
+                          <span style={{ fontSize: 9, fontWeight: 800, color: '#00C2A8', letterSpacing: '.15em', textTransform: 'uppercase' }}>Verified Service</span>
+                        </div>
+
+                        <h3 className="svc-title" style={{ fontSize: 22, fontWeight: 900, color: '#F5F2ED', marginBottom: 14, letterSpacing: '-.02em', transition: 'color 0.3s' }}>{title}</h3>
+                        <p className="svc-desc" style={{ fontSize: 13, lineHeight: 1.6, color: 'rgba(245,242,237,0.65)', marginBottom: 28, flex: 1, transition: 'color 0.3s' }}>{desc}</p>
+
+                        <div className="svc-link" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, color: '#00C2A8', textTransform: 'uppercase', letterSpacing: '.1em', transition: 'color 0.3s' }}>
+                          {cta} <ArrowRight size={14} className="svc-arrow" style={{ transition: 'transform 0.3s' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
             </div>
           </div>
         </Page>
@@ -921,7 +922,7 @@ export default function Home() {
               <Reveal>
                 <div className="workflow-mobile-img" style={{ display: 'none' }}>
                   <div style={{ borderRadius: 24, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: 32, textAlign: 'center', marginBottom: 40, boxShadow: '0 20px 40px rgba(0,0,0,0.3)', overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src="/realistic_about.png" alt="Happy Patient" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', mixBlendMode: 'overlay', opacity: 0.2 }} />
+                    <img src="/green_white_patient.png" alt="Happy Patient" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', mixBlendMode: 'overlay', opacity: 0.2 }} />
                     <div style={{ position: 'relative', zIndex: 1 }}>
                       <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#00C2A8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, border: '4px solid rgba(255,255,255,0.2)' }}>
                         <Zap size={32} color="white" />
@@ -1001,7 +1002,7 @@ export default function Home() {
                   animation: 'floatY 6s ease-in-out infinite',
                 }}>
                   <img
-                    src="/realistic_about.png"
+                    src="/green_white_patient.png"
                     alt="Healthcare consultation"
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   />
@@ -1039,18 +1040,7 @@ export default function Home() {
                   <ShieldCheck size={44} color="white" />
                 </div>
 
-                {/* HIPAA badge (top-left) */}
-                <div style={{
-                  position: 'absolute', top: 20, left: -20,
-                  background: 'rgba(20,38,30,0.92)', backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(176,186,198,0.2)', borderRadius: 12,
-                  padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8,
-                  boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
-                  animation: 'floatY 7s ease-in-out infinite 0.3s',
-                }}>
-                  <ShieldCheck size={18} color="#00C2A8" />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'white', whiteSpace: 'nowrap' }}>HIPAA Compliant</span>
-                </div>
+
               </div>
             </Reveal>
 
@@ -1075,6 +1065,7 @@ export default function Home() {
                 {[
                   { icon: ActivitySquare, t: 'High-Fidelity Interaction', d: 'An interface designed for precision and clarity in every medical transaction.' },
                   { icon: ShieldCheck, t: 'Encryption Standard', d: 'Every appointment and record is secured within a private, AES-256 encrypted node.' },
+                  // eslint-disable-next-line no-unused-vars
                 ].map(({ icon: Icon, t, d }, i) => (
                   <Reveal key={t} delay={i === 0 ? 'd1' : 'd2'}>
                     <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
@@ -1131,7 +1122,7 @@ export default function Home() {
                   name: 'MedWell Clinic', role: 'Partner Clinic', avatar: 'C',
                   text: 'Our patient management improved by 40% after joining careNconnect. Highly recommended!', stars: 5
                 },
-              ].map(({ name, role, avatar, text, stars }, i) => (
+              ].map(({ name, role, text, stars }, i) => (
                 <Reveal key={name} delay={i === 0 ? '' : i === 1 ? 'd2' : 'd4'}>
                   <div className="testi-card" style={{ padding: 32, height: '100%', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
@@ -1242,6 +1233,7 @@ export default function Home() {
                     { Icon: Mail, text: 'support@carenconnect.com' },
                     { Icon: Phone, text: '8848485663' },
                     { Icon: MapPin, text: 'Kerala, Kollam' },
+                    // eslint-disable-next-line no-unused-vars
                   ].map(({ Icon, text }) => (
                     <div key={text} style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'flex-start' }}>
                       <Icon size={14} color="#3D7A68" style={{ marginTop: 1, flexShrink: 0 }} />

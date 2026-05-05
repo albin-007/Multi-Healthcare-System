@@ -4,7 +4,7 @@ import {
   Pill, User, Heart, ArrowUpRight, ShieldCheck, LogOut, MessageSquare,
   AlertCircle, X, Star, Send, Stethoscope, CheckCircle2, Search,
   MapPin, Building2, LayoutDashboard, FlaskConical, CreditCard, RotateCcw,
-  ThumbsUp, Flag, Menu, Bell, ChevronDown, Users, Smartphone, TrendingUp, Phone, Microscope
+  ThumbsUp, Flag, Menu, Bell, ChevronDown, Users, Smartphone, TrendingUp, Phone, Microscope, Eye, Download, ExternalLink
 } from 'lucide-react';
 import api from '../../services/api';
 import { Button } from '../../components/ui/Button';
@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useDashboard } from '../../context/DashboardContext';
 import { motion } from 'framer-motion';
+import jsPDF from 'jspdf';
 
 export default function UserDashboard() {
   const navigate = useNavigate();
@@ -46,6 +47,13 @@ export default function UserDashboard() {
   const [complaintData, setComplaintData] = useState({ target_user: '', subject: '', description: '' });
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const [payingAppointmentId, setPayingAppointmentId] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+
+  // Profile management state
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ new_password: '', confirm_password: '' });
+  const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -128,6 +136,7 @@ export default function UserDashboard() {
     { id: 'Payment',      icon: Smartphone,      label: 'Payments' },
     { id: 'Feedback',     icon: ThumbsUp,        label: 'Feedback' },
     { id: 'Complaints',   icon: Flag,            label: 'Complaints' },
+    { id: 'Profile',      icon: User,            label: 'Security Settings' },
   ];
 
   useEffect(() => {
@@ -145,6 +154,55 @@ export default function UserDashboard() {
       fetchData(); // Refresh feedback list
     } catch (err) {
       showToast('Failed to submit feedback.', 'error');
+    }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!profileForm.new_password) {
+      showToast("Please enter a new password.", "error");
+      return;
+    }
+    if (profileForm.new_password !== profileForm.confirm_password) {
+      showToast("Passwords do not match.", "error");
+      return;
+    }
+    
+    setIsUpdatingProfile(true);
+    try {
+      const formData = new FormData();
+      if (profileForm.new_password) {
+        formData.append('new_password', profileForm.new_password);
+        formData.append('confirm_password', profileForm.confirm_password);
+      }
+      if (selectedAvatar) {
+        formData.append('avatar', selectedAvatar);
+      }
+
+      await api.patch('users/profiles/update_me/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setProfileForm({ new_password: '', confirm_password: '' });
+      setSelectedAvatar(null);
+      setAvatarPreview(null);
+      showToast("Clinical profile updated successfully.");
+      fetchData(); // Refresh user info to show new avatar
+    } catch (err) {
+      console.error("Profile Update Error:", err);
+      showToast(err.response?.data?.detail || "Failed to update profile.", "error");
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedAvatar(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setAvatarPreview(reader.result);
+      reader.readAsDataURL(file);
     }
   };
 
@@ -224,6 +282,111 @@ export default function UserDashboard() {
       console.error(err);
       showToast(`Payment failed: ${err.response?.data?.error || err.message || 'Unknown error'}`, 'error');
     }
+  };
+
+  const handleDownloadPDF = (appointment) => {
+    if (!appointment) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    const providerDoc = doctors.find(d => String(d.id) === String(appointment.entity_id));
+    const providerLab = labs.find(l => String(l.id) === String(appointment.entity_id));
+    
+    let providerName = appointment.entity_name;
+    if (!providerName || providerName === 'Unknown' || providerName.includes('Unknown')) {
+      providerName = appointment.entity_type === 'DOCTOR'
+        ? `Dr. ${(providerDoc?.name || 'Unknown').replace(/^Dr\.?\s*/i, '').trim()}`
+        : providerLab?.name || 'Unknown Lab';
+    } else {
+      providerName = appointment.entity_type === 'DOCTOR' 
+        ? `Dr. ${providerName.replace(/^Dr\.?\s*/i, '').trim()}`
+        : providerName;
+    }
+
+    // Header
+    doc.setFillColor(0, 201, 177); // brand-500
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+    doc.text("careNconnect", 20, 25);
+    
+    doc.setFontSize(10);
+    doc.text("Official Appointment Receipt", 20, 32);
+    
+    // Receipt Details
+    doc.setTextColor(51, 65, 85); // slate-700
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    
+    let y = 60;
+    
+    const addField = (label, value) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(`${label}:`, 20, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(String(value), 70, y);
+      y += 10;
+    };
+
+    addField("Appointment ID", `#${appointment.id}`);
+    addField("Patient Name", userName);
+    addField("Patient ID", `PID-${userInfo?.id || 'N/A'}`);
+    addField("Token Number", appointment.token || "Awaiting");
+    
+    const statusText = appointment.status;
+    addField("Status", statusText);
+    
+    y += 10;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(20, y - 5, pageWidth - 20, y - 5);
+    
+    addField("Service Type", appointment.entity_type === 'DOCTOR' ? 'Consultation' : 'Diagnostic Lab');
+    addField(appointment.entity_type === 'DOCTOR' ? 'Doctor Name' : 'Laboratory', providerName);
+    
+    const aptDate = new Date(appointment.date);
+    addField("Date", aptDate.toLocaleDateString([], { dateStyle: 'long' }));
+    addField("Time / Slot", aptDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    
+    if (appointment.entity_type === 'DOCTOR' && providerDoc?.clinic) {
+      addField("Clinic", providerDoc.clinic.name);
+      addField("Address", providerDoc.clinic.address || "N/A");
+    } else if (appointment.entity_type === 'LAB' && providerLab) {
+      addField("Address", providerLab.address || "N/A");
+    }
+
+    y += 10;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(20, y - 5, pageWidth - 20, y - 5);
+    
+    addField("Amount", `INR ${appointment.amount}`);
+    addField("Payment Status", appointment.is_paid ? "PAID" : "PENDING");
+    
+    const paymentModeLabel = appointment.payment_mode === 'PAY_AT_CLINIC' 
+      ? (appointment.entity_type === 'DOCTOR' ? 'Pay at Clinic' : 'Pay at Lab')
+      : 'Online Payment';
+    addField("Payment Mode", paymentModeLabel);
+
+    if (appointment.test_details && appointment.test_details.length > 0) {
+      const testNames = appointment.test_details.map(t => t.name).join(", ");
+      const wrappedTestNames = doc.splitTextToSize(testNames, 120);
+      doc.setFont("helvetica", "bold");
+      doc.text("Prescribed Tests:", 20, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(wrappedTestNames, 70, y);
+      y += (wrappedTestNames.length * 7);
+    }
+
+    // Footer
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text("This is an electronically generated receipt and does not require a physical signature.", pageWidth / 2, 280, { align: "center" });
+    doc.text("Generated on: " + new Date().toLocaleString(), pageWidth / 2, 285, { align: "center" });
+    
+    doc.save(`Appointment-${appointment.id}.pdf`);
   };
 
   // ── UNIQUE FEATURES LOGIC ──────────────────────────────────────────────────
@@ -572,7 +735,7 @@ export default function UserDashboard() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">
-                        {['Provider', 'Type', 'Date & Time', 'Status', 'Token', 'Payment'].map((h, i) => (
+                        {['Provider', 'Type', 'Date & Time', 'Status', 'Token', 'Payment', 'Action'].map((h, i) => (
                           <th key={i} className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">{h}</th>
                         ))}
                       </tr>
@@ -653,6 +816,17 @@ export default function UserDashboard() {
                                 ) : (
                                   <span className="text-slate-300 text-sm font-bold">—</span>
                                 )}
+                              </td>
+                              <td className="px-6 py-5 flex items-center gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => setSelectedAppointment(a)}
+                                  className="text-brand-600 hover:bg-brand-50 rounded-xl h-9 w-9 p-0"
+                                  title="View Details"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
                               </td>
                             </tr>
                           );
@@ -942,35 +1116,81 @@ export default function UserDashboard() {
                 </div>
               ) : (
                 <div className="grid gap-4">
-                  {testResults.map(t => (
-                    <div key={t.id} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all group">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                            <FlaskConical className="w-5 h-5" />
+                  {testResults.map(t => {
+                    const labInfo = labs.find(l => String(l.admin_user?.id) === String(t.lab?.id)) || t.lab;
+                    return (
+                      <div key={t.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-brand-50 dark:border-slate-800 shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 dark:bg-emerald-500/5 rounded-bl-full -mr-16 -mt-16 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/10 transition-colors" />
+                        
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 relative z-10">
+                          <div className="flex items-start gap-5">
+                            <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-inner">
+                              <FlaskConical className="w-6 h-6" />
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-xl font-black text-slate-900 dark:text-white leading-tight">{labInfo?.name || labInfo?.username || 'Verified Laboratory'}</h4>
+                              <p className="text-xs font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2">
+                                <Calendar className="w-3.5 h-3.5" /> 
+                                {new Date(t.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                              </p>
+                              {t.appointment?.test_details && (
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                  {t.appointment.test_details.map((test, i) => (
+                                    <Badge key={i} className="bg-brand-50 dark:bg-brand-500/10 text-brand-600 border-0 text-[9px] font-black uppercase tracking-wider px-2 py-1">
+                                      {test.name}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-black text-slate-900 dark:text-white">{t.lab?.username || 'Verified Lab'}</p>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-0.5">{new Date(t.created_at).toLocaleDateString()}</p>
+                          
+                          <div className="flex flex-col items-end gap-3">
+                            <Badge className={`border-0 text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-xl shadow-sm ${t.is_normal ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                              {t.is_normal ? 'Normal Range' : 'Requires Attention'}
+                            </Badge>
+                            <p className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest mt-1">Ref ID: #LB-{t.id}</p>
                           </div>
                         </div>
-                        <Badge className={`border-0 text-[10px] font-black uppercase tracking-wider ${t.is_normal ? 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400' : 'bg-rose-100 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400'}`}>
-                          {t.is_normal ? 'Normal' : 'Attention Required'}
-                        </Badge>
+
+                        <div className="mt-8 relative">
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500/20 rounded-full" />
+                          <div className="pl-6">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-2">
+                              <FileText className="w-3.5 h-3.5" /> Diagnostic Summary
+                            </p>
+                            <pre className="text-xs bg-slate-900 text-emerald-400 p-6 rounded-2xl font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-inner border border-slate-800">
+                              {t.result_data}
+                            </pre>
+                          </div>
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t border-slate-50 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 italic text-[10px] font-medium">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                            Digitally signed and encrypted by authority
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {t.file_url && (
+                              <Button 
+                                onClick={() => window.open(t.file_url, '_blank')}
+                                variant="outline"
+                                className="h-10 px-5 rounded-xl border-emerald-100 text-emerald-600 hover:bg-emerald-50 font-black text-[10px] uppercase gap-2"
+                              >
+                                <Download className="w-4 h-4" /> Original Report
+                              </Button>
+                            )}
+                            <Button 
+                              onClick={() => navigate(`/report/lab-test/${t.id}`)}
+                              className="h-10 px-6 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-black text-[10px] transition-all gap-2 uppercase tracking-wider shadow-lg shadow-brand-500/20"
+                            >
+                              <ExternalLink className="w-4 h-4" /> Verified Digital Copy
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <pre className="text-[11px] bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                        {t.result_data}
-                      </pre>
-                      <div className="mt-4 flex justify-end">
-                        <Button 
-                          onClick={() => navigate(`/report/lab-test/${t.id}`)}
-                          className="h-9 px-4 rounded-xl bg-brand-50 dark:bg-slate-950 text-brand-600 hover:bg-brand-600 hover:text-white font-black text-[10px] transition-all gap-2 uppercase tracking-wider"
-                        >
-                          <FileText className="w-4 h-4" /> View Digitally Signed Report
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1376,6 +1596,111 @@ export default function UserDashboard() {
             </div>
           )}
 
+          {/* ═══ PROFILE/SECURITY ═══════════════════════════════════════════ */}
+          {activeTab === 'Profile' && (
+            <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-500">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight italic">Security & Profile</h2>
+                <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 uppercase tracking-widest text-xs">Manage your clinical access credentials</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Profile Card */}
+                <div className="lg:col-span-1 space-y-6">
+                  <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-brand-50 dark:border-slate-800 shadow-xl shadow-slate-200/20 text-center relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-brand-500 to-indigo-600 opacity-10 group-hover:opacity-20 transition-opacity" />
+                    
+                    <div className="relative mt-4 mb-6 mx-auto w-32 h-32">
+                       <div className="w-full h-full rounded-[2.5rem] bg-slate-50 dark:bg-slate-950 flex items-center justify-center overflow-hidden border-4 border-white dark:border-slate-800 shadow-inner">
+                          {avatarPreview || userInfo?.avatar_url ? (
+                            <img src={avatarPreview || userInfo?.avatar_url} className="w-full h-full object-cover" alt="Profile" />
+                          ) : (
+                            <User className="w-12 h-12 text-slate-300" />
+                          )}
+                       </div>
+                       <label className="absolute -bottom-2 -right-2 w-10 h-10 bg-brand-600 text-white rounded-2xl flex items-center justify-center cursor-pointer hover:bg-brand-700 hover:scale-110 active:scale-95 transition-all shadow-lg border-4 border-white dark:border-slate-900">
+                          <Download className="w-5 h-5 rotate-180" />
+                          <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                       </label>
+                    </div>
+
+                    <h4 className="text-xl font-black text-slate-900 dark:text-white">{userInfo?.display_name}</h4>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">{userInfo?.role}</p>
+
+                    <div className="mt-8 pt-8 border-t border-slate-50 dark:border-slate-800 grid grid-cols-2 gap-4">
+                       <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1">Visits</p>
+                          <p className="text-lg font-black text-brand-600">{appointments.length}</p>
+                       </div>
+                       <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter mb-1">Status</p>
+                          <p className="text-sm font-black text-emerald-600 uppercase">Active</p>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-indigo-600 p-8 rounded-[3rem] text-white shadow-xl shadow-indigo-500/20">
+                     <ShieldCheck className="w-10 h-10 mb-4 opacity-50" />
+                     <h4 className="text-lg font-black mb-2">Secure Node</h4>
+                     <p className="text-xs font-bold text-indigo-100 leading-relaxed">Your profile and clinical history are encrypted and stored in a private healthcare cloud.</p>
+                  </div>
+                </div>
+
+                {/* Form */}
+                <div className="lg:col-span-2">
+                  <div className="bg-white dark:bg-slate-900 p-10 rounded-[3rem] border border-brand-50 dark:border-slate-800 shadow-sm">
+                    <form onSubmit={handleUpdateProfile} className="space-y-8">
+                      <div className="flex items-center gap-4 p-6 bg-brand-50 dark:bg-slate-950 rounded-[2rem]">
+                        <div className="w-16 h-16 rounded-2xl bg-brand-600 text-white flex items-center justify-center">
+                          <ShieldCheck className="w-8 h-8" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-slate-900 dark:text-white">Security & Identity</h3>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter mt-0.5">Synchronize credentials and bio-data</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:border-slate-500 ml-1">New Password</label>
+                            <input 
+                              type="password"
+                              value={profileForm.new_password}
+                              onChange={(e) => setProfileForm({...profileForm, new_password: e.target.value})}
+                              placeholder="Leave blank to keep current"
+                              className="w-full h-16 px-6 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:border-slate-500 ml-1">Confirm New Password</label>
+                            <input 
+                              type="password"
+                              value={profileForm.confirm_password}
+                              onChange={(e) => setProfileForm({...profileForm, confirm_password: e.target.value})}
+                              placeholder="Repeat your password"
+                              className="w-full h-16 px-6 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button 
+                        type="submit" 
+                        disabled={isUpdatingProfile}
+                        className="w-full h-16 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-black shadow-xl shadow-brand-500/20 group"
+                      >
+                        {isUpdatingProfile ? 'Syncing Node...' : 'Synchronize Profile Changes'}
+                        {!isUpdatingProfile && <RotateCcw className="ml-2 w-5 h-5 group-hover:rotate-180 transition-transform duration-500" />}
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
       {/* ── Doctor Details Modal ────────────────────────────────────────── */}
       {selectedDoctorInfo && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6 animate-in fade-in duration-300">
@@ -1383,8 +1708,8 @@ export default function UserDashboard() {
             <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-5">
                 <img 
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedDoctorInfo.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                  className="w-20 h-20 rounded-3xl border-4 border-white dark:border-slate-800 shadow-2xl shadow-brand-500/10" 
+                  src={selectedDoctorInfo.user_details?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedDoctorInfo.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                  className="w-20 h-20 rounded-3xl border-4 border-white dark:border-slate-800 shadow-2xl shadow-brand-500/10 object-cover" 
                   alt={selectedDoctorInfo.name} 
                 />
                 <div>
@@ -1412,24 +1737,35 @@ export default function UserDashboard() {
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Professional Background</h4>
                   <div className="space-y-4">
-                    <div className="flex items-center gap-4 group">
-                      <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-brand-600 flex items-center justify-center">
+                    <div className="flex items-start gap-4 group">
+                      <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-500/10 text-brand-600 flex items-center justify-center shrink-0">
                         <ShieldCheck className="w-5 h-5" />
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Qualifications</p>
-                        <p className="font-bold text-slate-900 dark:text-white text-sm">{selectedDoctorInfo.qualification || 'N/A'}</p>
+                      <div className="flex-1 min-w-0 pt-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Qualifications</p>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm leading-relaxed">{selectedDoctorInfo.qualification || 'N/A'}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-500/10 text-violet-600 flex items-center justify-center">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-violet-50 dark:bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0">
                         <FileText className="w-5 h-5" />
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">License Number</p>
-                        <p className="font-bold text-slate-900 dark:text-white text-sm">{selectedDoctorInfo.license_no || 'Pending Verification'}</p>
+                      <div className="flex-1 min-w-0 pt-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">License Number</p>
+                        <p className="font-bold text-slate-900 dark:text-white text-sm leading-relaxed">{selectedDoctorInfo.license_no || 'Pending Verification'}</p>
                       </div>
                     </div>
+                    {selectedDoctorInfo.user_details?.phone_number && (
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                          <Phone className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 min-w-0 pt-1">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Direct Contact</p>
+                          <p className="font-bold text-slate-900 dark:text-white text-sm leading-relaxed tabular-nums">{selectedDoctorInfo.user_details.phone_number}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1541,9 +1877,9 @@ export default function UserDashboard() {
                     </Badge>
                   </div>
                   <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{selectedClinicInfo.name}</h3>
-                  <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mt-1">
-                    <MapPin className="w-4 h-4 text-brand-500" />
-                    <span className="text-sm font-bold">{selectedClinicInfo.address}</span>
+                  <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400 mt-2">
+                    <MapPin className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
+                    <span className="text-sm font-bold leading-relaxed">{selectedClinicInfo.address}</span>
                   </div>
                 </div>
               </div>
@@ -1554,20 +1890,24 @@ export default function UserDashboard() {
 
             <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
               {/* Clinic Insights Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <div className="p-5 border border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 rounded-3xl group hover:border-brand-100 transition-colors">
-                    <div className="flex items-center gap-3 mb-2">
-                       <Clock className="w-4 h-4 text-brand-500" />
-                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Opening Hours</span>
+              <div className="space-y-4">
+                 <div className="p-6 border border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 rounded-[2rem] group hover:bg-white dark:hover:bg-slate-900 hover:shadow-xl transition-all duration-500 flex items-center gap-6">
+                    <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-950 flex items-center justify-center text-brand-500 shadow-sm shrink-0 group-hover:scale-110 transition-transform">
+                       <Clock className="w-7 h-7" />
                     </div>
-                    <p className="font-bold text-slate-900 dark:text-white text-sm">Open 24/7 • Emergency Ready</p>
+                    <div className="flex-1">
+                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Opening Hours</p>
+                       <p className="font-bold text-slate-900 dark:text-white text-base">Open 24/7 • Emergency Ready</p>
+                    </div>
                  </div>
-                 <div className="p-5 border border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 rounded-3xl group hover:border-brand-100 transition-colors">
-                    <div className="flex items-center gap-3 mb-2">
-                       <Phone className="w-4 h-4 text-brand-500" />
-                       <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Contact Desk</span>
+                 <div className="p-6 border border-slate-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 rounded-[2rem] group hover:bg-white dark:hover:bg-slate-900 hover:shadow-xl transition-all duration-500 flex items-center gap-6">
+                    <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-950 flex items-center justify-center text-brand-500 shadow-sm shrink-0 group-hover:scale-110 transition-transform">
+                       <Phone className="w-7 h-7" />
                     </div>
-                    <p className="font-bold text-slate-900 dark:text-white text-sm">+91 82813 46911</p>
+                    <div className="flex-1">
+                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Contact Desk</p>
+                       <p className="font-bold text-slate-900 dark:text-white text-base tabular-nums">+91 82813 46911</p>
+                    </div>
                  </div>
               </div>
 
@@ -1626,6 +1966,92 @@ export default function UserDashboard() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Appointment Details Modal ────────────────────────────────────── */}
+      {selectedAppointment && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col"
+          >
+            <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex items-center justify-between bg-brand-600 relative overflow-hidden">
+               <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.1),transparent_50%)]" />
+               <div className="relative z-10">
+                 <h3 className="text-2xl font-black text-white tracking-tight italic">Appointment Overview</h3>
+                 <p className="text-brand-100 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">Ref: #APT-{selectedAppointment.id}</p>
+               </div>
+               <button onClick={() => setSelectedAppointment(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl text-white transition-all relative z-10">
+                 <X size={20} />
+               </button>
+            </div>
+
+            <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+               {/* Provider Info */}
+               <div className="flex items-center gap-5 p-6 bg-brand-50/50 dark:bg-slate-950/50 rounded-3xl border border-brand-50 dark:border-slate-800">
+                  <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 shadow-sm flex items-center justify-center text-brand-600">
+                     {selectedAppointment.entity_type === 'DOCTOR' ? <Stethoscope size={32} /> : <Microscope size={32} />}
+                  </div>
+                  <div>
+                     <p className="text-[10px] font-black uppercase text-brand-600 tracking-widest mb-1">{selectedAppointment.entity_type}</p>
+                     <h4 className="text-xl font-black text-slate-900 dark:text-white leading-tight">
+                        {(() => {
+                           const doc = doctors.find(d => String(d.id) === String(selectedAppointment.entity_id));
+                           const lab = labs.find(l => String(l.id) === String(selectedAppointment.entity_id));
+                           let name = selectedAppointment.entity_name;
+                           if (!name || name === 'Unknown' || name.includes('Unknown')) {
+                             name = selectedAppointment.entity_type === 'DOCTOR' ? (doc?.name || '') : (lab?.name || '');
+                           }
+                           return selectedAppointment.entity_type === 'DOCTOR' ? `Dr. ${name.replace(/^Dr\.?\s*/i, '').trim()}` : name;
+                        })()}
+                     </h4>
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="p-5 border border-slate-100 dark:border-slate-800 rounded-3xl">
+                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Schedule</p>
+                     <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-brand-500" />
+                        <span className="text-sm font-black text-slate-700 dark:text-slate-300">{new Date(selectedAppointment.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                     </div>
+                     <div className="flex items-center gap-3 mt-2">
+                        <Clock className="w-4 h-4 text-brand-500" />
+                        <span className="text-sm font-black text-slate-700 dark:text-slate-300">
+                          {selectedAppointment.time_slot || (selectedAppointment.date ? new Date(selectedAppointment.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Pending Time')}
+                        </span>
+                     </div>
+                  </div>
+
+                  <div className="p-5 border border-slate-100 dark:border-slate-800 rounded-3xl">
+                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Status & Payment</p>
+                     <div className="mb-2">{getStatusBadge(selectedAppointment.status)}</div>
+                     <p className="text-xs font-black text-slate-600 dark:text-slate-400 uppercase tracking-tighter">
+                        Mode: <span className="text-brand-600">{selectedAppointment.payment_mode?.replace(/_/g, ' ') || 'N/A'}</span>
+                     </p>
+                  </div>
+               </div>
+            </div>
+
+            <div className="p-8 bg-slate-50/50 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex gap-4">
+               <Button 
+                 variant="outline" 
+                 onClick={() => setSelectedAppointment(null)} 
+                 className="flex-1 rounded-2xl h-14 font-black border-slate-200"
+               >
+                 Close
+               </Button>
+               <Button 
+                 onClick={() => { handleDownloadPDF(selectedAppointment); }}
+                 className="flex-1 bg-brand-600 hover:bg-brand-700 text-white rounded-2xl h-14 font-black shadow-xl shadow-brand-500/20 gap-3"
+               >
+                 <Download size={20} />
+                 Download Receipt
+               </Button>
+            </div>
+          </motion.div>
         </div>
       )}
 

@@ -521,7 +521,7 @@ export default function BookAppointment() {
     if (bookedAppointment.is_paid) {
       doc.setTextColor(0, 201, 177);
       doc.text("Amount Paid:", 20, y + 5);
-      const totalPaidValue = paymentMode === 'PAY_AT_CLINIC' ? 0 : (entityInfo.advance_payment ? entityInfo.advance_payment + 2 : totalAmount + 2);
+      const totalPaidValue = paymentMode === 'PAY_AT_CLINIC' ? 0 : (entityInfo.advance_payment ? entityInfo.advance_payment + 2 : totalAmount);
       doc.text(`INR ${totalPaidValue.toFixed(2)}`, 70, y + 5);
     } else {
       doc.setTextColor(255, 107, 107); // rose-500
@@ -626,13 +626,23 @@ export default function BookAppointment() {
                 {entityType === 'DOCTOR' && selectedEntityId && selectedClinicId ? (
                   <div className="space-y-8 animate-in zoom-in-95 duration-500">
                     <div className="grid md:grid-cols-3 gap-10 items-start">
-                       <div className="md:col-span-1">
-                          <img 
-                            src={`https://api.dicebear.com/7.x/shapes/svg?seed=${clinics.find(c => c.id === selectedClinicId)?.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                            className="w-full aspect-square rounded-[3rem] border-4 border-white shadow-2xl shadow-brand-500/10 object-cover" 
-                            alt="Clinic" 
-                          />
-                       </div>
+                        <div className="md:col-span-1">
+                           <div className="w-full aspect-square rounded-[3rem] border-4 border-white shadow-2xl shadow-brand-500/10 overflow-hidden">
+                              {clinics.find(c => c.id === selectedClinicId)?.admin_user?.avatar_url ? (
+                                <img 
+                                  src={clinics.find(c => c.id === selectedClinicId).admin_user.avatar_url} 
+                                  alt="Clinic" 
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <img 
+                                  src={`https://api.dicebear.com/7.x/shapes/svg?seed=${clinics.find(c => c.id === selectedClinicId)?.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                                  className="w-full h-full object-cover" 
+                                  alt="Clinic" 
+                                />
+                              )}
+                           </div>
+                        </div>
                        <div className="md:col-span-2 space-y-6 text-left">
                           <div>
                              <Badge className="bg-brand-50 text-brand-600 border-0 uppercase text-[10px] font-black tracking-widest px-3 py-1 mb-3">Clinical Workspace</Badge>
@@ -642,22 +652,28 @@ export default function BookAppointment() {
                              <p className="text-slate-400 font-bold mt-2 italic text-left">Operating as the primary treatment center for Dr. {doctors.find(d => d.id === selectedEntityId)?.name}.</p>
                           </div>
 
-                          <div className="grid sm:grid-cols-2 gap-4">
-                             <div className="flex items-center gap-4 bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
-                                <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-brand-500 shadow-sm"><MapPin className="w-6 h-6" /></div>
-                                <div>
-                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-left">Location</p>
-                                   <p className="font-bold text-slate-900 text-sm">{clinics.find(c => c.id === selectedClinicId)?.address || 'Address Verified'}</p>
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-4 bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
-                                <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-brand-500 shadow-sm"><Phone className="w-6 h-6" /></div>
-                                <div>
-                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-left">Medical Desk</p>
-                                   <p className="font-bold text-slate-900 text-sm text-left">+91 82813 46911</p>
-                                </div>
-                             </div>
-                          </div>
+                           <div className="space-y-4">
+                              <div className="flex items-center gap-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 group hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500">
+                                 <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-brand-500 shadow-sm shrink-0 border border-slate-50 group-hover:scale-110 transition-transform duration-500">
+                                    <MapPin className="w-7 h-7" />
+                                 </div>
+                                 <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 text-left mb-1">Location / Address</p>
+                                    <p className="font-bold text-slate-900 text-base leading-relaxed break-words">{clinics.find(c => c.id === selectedClinicId)?.address || 'Address Verified'}</p>
+                                 </div>
+                              </div>
+                              <div className="grid grid-cols-1 gap-4">
+                                 <div className="flex items-center gap-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 group hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500">
+                                    <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-brand-500 shadow-sm shrink-0 border border-slate-50 group-hover:scale-110 transition-transform duration-500">
+                                       <Phone className="w-7 h-7" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 text-left mb-1">Medical Desk</p>
+                                       <p className="font-bold text-slate-900 text-base text-left tabular-nums">+91 82813 46911</p>
+                                    </div>
+                                 </div>
+                              </div>
+                           </div>
 
                           <div className="p-6 rounded-[2rem] bg-brand-500 text-white flex items-start gap-5 shadow-xl shadow-brand-500/20">
                              <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
@@ -775,8 +791,12 @@ export default function BookAppointment() {
                           onClick={() => { setSelectedClinicId(c.id); setSearchQuery(''); }}
                           className="group p-5 rounded-3xl border-2 transition-all cursor-pointer flex items-center gap-5 border-slate-100 bg-white hover:border-brand-200 hover:shadow-md"
                         >
-                          <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center border-2 border-white shadow-lg shadow-brand-500/10">
-                            <Building2 className="w-8 h-8 text-brand-500" />
+                          <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center border-2 border-white shadow-lg shadow-brand-500/10 overflow-hidden">
+                            {c.admin_user?.avatar_url ? (
+                              <img src={c.admin_user.avatar_url} className="w-full h-full object-cover" alt={c.name} />
+                            ) : (
+                              <Building2 className="w-8 h-8 text-brand-500" />
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <h4 className="font-bold text-slate-900 text-lg flex items-center gap-2">
@@ -808,7 +828,7 @@ export default function BookAppointment() {
                           className={`group p-5 rounded-3xl border-2 transition-all cursor-pointer flex items-center gap-5 ${selectedEntityId === d.id ? 'border-brand-500 bg-brand-50/50 shadow-md' : 'border-slate-100 bg-white hover:border-slate-200'}`}
                         >
                           <img 
-                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${d.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                            src={d.user_details?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${d.name}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
                             className="w-16 h-16 rounded-2xl border-2 border-white shadow-lg shadow-brand-500/10 object-cover" 
                             alt={d.name} 
                           />
@@ -874,11 +894,21 @@ export default function BookAppointment() {
                             onClick={() => setSelectedEntityId(l.id)}
                             className={`group p-5 rounded-3xl border-2 transition-all cursor-pointer flex items-center gap-5 ${selectedEntityId === l.id ? 'border-brand-500 bg-brand-50/50 shadow-md' : 'border-slate-100 bg-white hover:border-slate-200'}`}
                           >
-                            <img 
-                              src={`https://api.dicebear.com/7.x/shapes/svg?seed=${l.name || l.username}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                              className="w-16 h-16 rounded-2xl border-2 border-white shadow-lg shadow-brand-500/10" 
-                              alt={l.name || l.username} 
-                            />
+                            <div className="w-16 h-16 rounded-2xl border-2 border-white shadow-lg shadow-brand-500/10 overflow-hidden flex items-center justify-center bg-brand-50">
+                              {l.admin_user?.avatar_url ? (
+                                <img 
+                                  src={l.admin_user.avatar_url} 
+                                  className="w-full h-full object-cover" 
+                                  alt={l.name || l.username} 
+                                />
+                              ) : (
+                                <img 
+                                  src={`https://api.dicebear.com/7.x/shapes/svg?seed=${l.name || l.username}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                                  className="w-full h-full object-cover" 
+                                  alt={l.name || l.username} 
+                                />
+                              )}
+                            </div>
                             <div className="flex-1 min-w-0 text-left">
                               <h4 className="font-bold text-slate-900 text-lg flex items-center gap-2">
                                 {l.name || l.username}
@@ -1312,7 +1342,7 @@ export default function BookAppointment() {
                          </div>
                          <div className="pt-6 border-t-2 border-dashed border-slate-100 flex justify-between items-center">
                           <span className="text-slate-400 font-black uppercase tracking-widest">Amount Paid</span>
-                          <span className="text-3xl font-black text-brand-600">₹{paymentMode === 'PAY_AT_CLINIC' ? '0.00' : (entityInfo?.advance_payment ? (entityInfo.advance_payment + 2).toFixed(2) : (totalAmount + 2).toFixed(2))}</span>
+                          <span className="text-3xl font-black text-brand-600">₹{paymentMode === 'PAY_AT_CLINIC' ? '0.00' : (entityInfo?.advance_payment ? (entityInfo.advance_payment + 2).toFixed(2) : totalAmount.toFixed(2))}</span>
                        </div>
                        </div>
 
@@ -1359,8 +1389,12 @@ export default function BookAppointment() {
 
               <div className="space-y-6">
                 <div className="flex gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center shrink-0">
-                    <UserCircle className="w-7 h-7 text-brand-500" />
+                  <div className="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center shrink-0 overflow-hidden border border-brand-100 shadow-inner">
+                    {entityInfo?.avatar_url ? (
+                      <img src={entityInfo.avatar_url} className="w-full h-full object-cover" alt="Provider" />
+                    ) : (
+                      <UserCircle className="w-7 h-7 text-brand-500" />
+                    )}
                   </div>
                   <div>
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">Recipient</p>

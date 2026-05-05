@@ -1,17 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+
 import {
   ShieldCheck, Activity, Users, CheckCircle2, Clock, AlertCircle,
   ArrowUpRight, ChevronRight, ActivitySquare, LogOut, ShieldAlert,
   Zap, LayoutDashboard, UserCog, FileSearch, MessageSquareWarning,
   Check, X, XCircle, Search, UserPlus, Trash2, Building2, FlaskConical,
-  FileText, Eye, Download, Upload, Ban, Bell
+  FileText, Eye, Download, Upload, Ban, Bell,
+  IndianRupee, CalendarDays, Wallet, Briefcase
 } from 'lucide-react';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { useAuth } from '../../hooks/useAuth';
 import { useDashboard } from '../../context/DashboardContext';
 import { useTheme } from '../../context/ThemeContext';
 import { 
@@ -345,6 +346,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [approvalData, setApprovalData] = useState(null);
+  const [dashboardStats, setDashboardStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
@@ -353,13 +355,10 @@ export default function AdminDashboard() {
   const [selectedEntityType, setSelectedEntityType] = useState('');
   const [docViewEntity, setDocViewEntity] = useState(null);
 
-  const navigate = useNavigate();
-  const { userName } = useAuth();
   const { theme } = useTheme();
 
 
   const activeTab = activeSubTab || 'dashboard';
-  const setActiveTab = setActiveSubTab;
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -370,14 +369,16 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [userRes, complaintRes, approvalRes] = await Promise.all([
+      const [userRes, complaintRes, approvalRes, statsRes] = await Promise.all([
         api.get('users/profiles/'),
         api.get('users/complaints/'),
         api.get('users/approvals/'),
+        api.get('users/admin-dashboard/'),
       ]);
       setUsers(userRes.data);
       setComplaints(complaintRes.data);
       setApprovalData(approvalRes.data);
+      setDashboardStats(statsRes.data);
     } catch (err) {
       console.error('Failed to fetch admin data', err);
     } finally {
@@ -389,24 +390,29 @@ export default function AdminDashboard() {
 
   const pendingCount = (approvalData?.pending_clinics?.length || 0) + (approvalData?.pending_labs?.length || 0);
 
+  const unresolvedComplaintsCount = complaints.filter(c => !c.is_resolved).length;
+
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: ActivitySquare },
     { id: 'approvals', label: 'Approvals', icon: ShieldCheck, badge: pendingCount },
     { id: 'users', label: 'Users', icon: UserCog },
-    { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, badge: complaints.filter(c => !c.is_resolved).length },
+    { id: 'complaints', label: 'Complaints', icon: MessageSquareWarning, badge: unresolvedComplaintsCount },
+    { id: 'appointments', label: 'Appointments', icon: CalendarDays },
+    { id: 'revenue', label: 'Revenue', icon: Wallet },
   ];
 
   useEffect(() => {
     setSubTabs(tabs);
     if (!activeSubTab) setActiveSubTab('dashboard');
-  }, [pendingCount, complaints.filter(c => !c.is_resolved).length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCount, unresolvedComplaintsCount]);
 
   const handleApprove = async (userId) => {
     try {
       await api.post(`users/profiles/${userId}/approve/`);
       showToast('✅ Entity approved successfully!', 'success');
       fetchData();
-    } catch (err) {
+    } catch {
       showToast('Failed to approve. Please try again.', 'error');
     }
   };
@@ -416,7 +422,7 @@ export default function AdminDashboard() {
       await api.post(`users/profiles/${userId}/reject/`);
       showToast('❌ Entity rejected.', 'error');
       fetchData();
-    } catch (err) {
+    } catch {
       showToast('Failed to reject. Please try again.', 'error');
     }
   };
@@ -494,12 +500,14 @@ export default function AdminDashboard() {
               </div>
 
               {/* Stats Ribbon */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 {[
-                  { label: 'Network Users', val: users.length, icon: Users, color: 'from-emerald-500 to-teal-600', trend: '+12%', trendColor: 'text-emerald-500' },
-                  { label: 'Pending Docs', val: pendingCount, icon: Clock, color: 'from-amber-400 to-orange-500', trend: 'Critical', trendColor: 'text-rose-500' },
-                  { label: 'Active Clinics', val: (approvalData?.approved_clinics?.length || 0), icon: Building2, color: 'from-brand-600 to-brand-800', trend: '+5', trendColor: 'text-brand-teal' },
-                  { label: 'Open Issues', val: complaints.filter(c => !c.is_resolved).length, icon: ShieldAlert, color: 'from-rose-500 to-red-700', trend: '-2', trendColor: 'text-emerald-500' },
+                  { label: 'Total Users', val: dashboardStats?.stats?.total_users || 0, icon: Users, color: 'from-emerald-500 to-teal-600', trend: '+12%', trendColor: 'text-emerald-500' },
+                  { label: 'Total Doctors', val: dashboardStats?.stats?.total_doctors || 0, icon: Briefcase, color: 'from-brand-600 to-brand-800', trend: '+5%', trendColor: 'text-brand-teal' },
+                  { label: 'Total Clinics', val: dashboardStats?.stats?.total_clinics || 0, icon: Building2, color: 'from-violet-500 to-purple-600', trend: '+2', trendColor: 'text-violet-500' },
+                  { label: 'Total Labs', val: dashboardStats?.stats?.total_labs || 0, icon: FlaskConical, color: 'from-amber-400 to-orange-500', trend: '+1', trendColor: 'text-amber-500' },
+                  { label: 'Total Appts', val: dashboardStats?.stats?.total_appointments || 0, icon: CalendarDays, color: 'from-blue-500 to-indigo-600', trend: '+18%', trendColor: 'text-blue-500' },
+                  { label: 'Total Lab Tests', val: dashboardStats?.stats?.total_lab_tests || 0, icon: Activity, color: 'from-rose-400 to-rose-600', trend: '+7%', trendColor: 'text-rose-500' },
                 ].map((s, i) => (
                   <motion.div 
                     initial={{ y: 20, opacity: 0 }}
@@ -939,7 +947,126 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* ═══ APPOINTMENTS ══════════════════════════════════════════════════ */}
+          {activeTab === 'appointments' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Appointments</h2>
+                <p className="text-slate-400 dark:text-slate-500 font-medium text-sm mt-1">View all platform appointments and their current status.</p>
+              </div>
 
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
+                        {['Patient', 'Entity', 'Date & Time', 'Status', 'Payment'].map((h, i) => (
+                          <th key={i} className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                      {dashboardStats?.recent_appointments?.map((a, idx) => (
+                        <tr key={idx} className="hover:bg-brand-50 dark:hover:bg-slate-950/20 transition-colors">
+                          <td className="px-6 py-4 font-bold text-sm text-slate-900 dark:text-white">{a.user_name}</td>
+                          <td className="px-6 py-4 text-xs font-medium text-slate-500 dark:text-slate-400">{a.entity_name}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-slate-700 dark:text-slate-300">
+                            {new Date(a.date).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4">
+                            <StatusBadge status={a.status} />
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${a.is_paid ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-amber-600 bg-amber-50 border-amber-100'}`}>
+                              {a.is_paid ? 'PAID' : 'UNPAID'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {!dashboardStats?.recent_appointments?.length && (
+                        <tr>
+                          <td colSpan="5" className="px-6 py-8 text-center text-sm font-bold text-slate-400">No appointments found.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ REVENUE ═══════════════════════════════════════════════════════ */}
+          {activeTab === 'revenue' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Revenue Management <span className="text-2xl">💰</span></h2>
+                <p className="text-slate-400 dark:text-slate-500 font-medium text-sm mt-1">Track platform revenue, commissions, and recent transactions.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 rounded-[2rem] text-white shadow-xl shadow-emerald-500/20">
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-[10px] font-black uppercase tracking-wider mb-6">
+                    <Wallet size={14} /> Platform Revenue
+                  </div>
+                  <h3 className="text-5xl font-black tracking-tight mb-2">
+                    ₹{dashboardStats?.stats?.total_revenue?.toLocaleString() || 0}
+                  </h3>
+                  <p className="text-white/80 text-sm font-medium">Total volume processed through the platform.</p>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-brand-50 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-brand-50 dark:bg-brand-900/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="relative z-10">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-50 dark:bg-slate-800 text-brand-600 dark:text-brand-400 text-[10px] font-black uppercase tracking-wider mb-6">
+                      <Zap size={14} /> Commission Earned
+                    </div>
+                    <h3 className="text-5xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
+                      ₹{dashboardStats?.stats?.commission_earned?.toLocaleString() || 0}
+                    </h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">10% platform fee from all successful transactions.</p>
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mt-8 mb-4">Transaction History</h3>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
+                        {['Txn ID', 'User', 'Amount', 'Date', 'Method', 'Status'].map((h, i) => (
+                          <th key={i} className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                      {dashboardStats?.recent_payments?.map((p, idx) => (
+                        <tr key={idx} className="hover:bg-brand-50 dark:hover:bg-slate-950/20 transition-colors">
+                          <td className="px-6 py-4 font-mono text-[10px] text-slate-500 dark:text-slate-400">{p.payment_id}</td>
+                          <td className="px-6 py-4 font-bold text-sm text-slate-900 dark:text-white">{p.user_name}</td>
+                          <td className="px-6 py-4 font-black text-brand-600 dark:text-teal-400">₹{p.amount}</td>
+                          <td className="px-6 py-4 text-xs font-bold text-slate-700 dark:text-slate-300">
+                            {new Date(p.date).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-xs font-medium text-slate-500 dark:text-slate-400">{p.method}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${p.status === 'SUCCESS' ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : p.status === 'FAILED' ? 'text-rose-600 bg-rose-50 border-rose-100' : 'text-amber-600 bg-amber-50 border-amber-100'}`}>
+                              {p.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {!dashboardStats?.recent_payments?.length && (
+                        <tr>
+                          <td colSpan="6" className="px-6 py-8 text-center text-sm font-bold text-slate-400">No recent transactions found.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
           {selectedEntity && (
             <EntityDetailModal

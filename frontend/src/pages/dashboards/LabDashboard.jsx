@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
 import { useAuth } from '../../hooks/useAuth';
 import { useDashboard } from '../../context/DashboardContext';
 import api from '../../services/api';
@@ -12,8 +13,13 @@ import {
   Calendar, ActivitySquare, LogOut, ShieldCheck, ArrowUpRight, CheckCircle2, X,
   LayoutDashboard, Menu, Search, Clock, Eye, Ban, FileText, UserIcon, HeartPulse, Download,
   ClipboardList, CalendarDays, Bell, Settings, Activity, FlaskConical, FileCheck2, UploadCloud, File,
-  ChevronDown, Share, Heart, CheckCircle
+  ChevronDown, Share, Heart, CheckCircle, BarChart3 as BarIcon, TrendingUp, DollarSign, PieChart as PieIcon,
+  TrendingDown, Briefcase, Zap, Globe, History
 } from 'lucide-react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  LineChart, Line, PieChart, Pie, Cell, AreaChart, Area 
+} from 'recharts';
 import { motion } from 'framer-motion';
 
 export default function LabDashboard() {
@@ -54,6 +60,9 @@ export default function LabDashboard() {
   const [newTest, setNewTest] = useState({ name: '', description: '', price: '', category: '' });
   const [isAddingTest, setIsAddingTest] = useState(false);
   
+  // Password change state
+  const [passwordForm, setPasswordForm] = useState({ new_password: '', confirm_password: '' });
+  
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { setSubTabs, activeSubTab, setActiveSubTab, notifications, unreadCount, markNotificationAsRead, markAllNotificationsAsRead } = useDashboard();
   const activeTab = activeSubTab || 'Dashboard';
@@ -62,10 +71,12 @@ export default function LabDashboard() {
   // Upload Result State
   const [uploadData, setUploadData] = useState({ appointmentId: '', notes: '', file: null, isNormal: true });
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedPreviewDate, setSelectedPreviewDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cancelAppointment, setCancelAppointment] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [cancellationReason, setCancellationReason] = useState('');
+  const [analyticsTab, setAnalyticsTab] = useState('Overview'); // 'Overview' or 'Pipeline'
   const cancellationReasons = [
     "Lab closed unexpectedly",
     "Equipment malfunction",
@@ -76,7 +87,7 @@ export default function LabDashboard() {
     "Other"
   ];
 
-  const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -137,17 +148,86 @@ export default function LabDashboard() {
   const scheduledTests = (appointments || []).filter(a => a.status === 'CONFIRMED');
   const completedTests = (appointments || []).filter(a => a.status === 'COMPLETED');
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ANALYTICS DERIVATION
+  // ─────────────────────────────────────────────────────────────────────────────
+  const analytics = useMemo(() => {
+    const appts = appointments || [];
+    const completed = appts.filter(a => a.status === 'COMPLETED');
+    const totalDone = completed.length;
+    const revenue = completed.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
+    
+    // Test Distribution
+    const testCounts = {};
+    appts.forEach(a => {
+      a.test_details?.forEach(t => {
+        testCounts[t.name] = (testCounts[t.name] || 0) + 1;
+      });
+    });
+    
+    const popularTests = Object.entries(testCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // Daily Trend (Last 10 days)
+    const dailyMap = {};
+    const today = new Date();
+    for(let i = 9; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      dailyMap[label] = { name: label, tests: 0, revenue: 0 };
+    }
+
+    appts.forEach(a => {
+      if (!a.date) return;
+      const label = new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (dailyMap[label]) {
+        dailyMap[label].tests++;
+        if (a.status === 'COMPLETED') {
+          dailyMap[label].revenue += parseFloat(a.amount || 0);
+        }
+      }
+    });
+
+    const dailyTrend = Object.values(dailyMap);
+
+    // Status Pie
+    const statusData = [
+      { name: 'Completed', value: completed.length, color: '#10b981' },
+      { name: 'Pending', value: appts.filter(a => a.status === 'PENDING').length, color: '#f59e0b' },
+      { name: 'Cancelled', value: appts.filter(a => a.status === 'CANCELLED').length, color: '#f43f5e' }
+    ];
+
+    // Home Collection Stats
+    const homeCollectionCount = appts.filter(a => a.is_home_collection).length;
+    const labVisitCount = appts.length - homeCollectionCount;
+
+    return { 
+      totalDone, 
+      revenue, 
+      popularTests, 
+      dailyTrend, 
+      statusData,
+      homeStats: [
+        { name: 'Home', value: homeCollectionCount },
+        { name: 'Lab', value: labVisitCount }
+      ]
+    };
+  }, [appointments]);
+
 
   const navItems = [
     { id: 'Dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'Test Requests', icon: ClipboardList, label: 'Test Requests' },
     { id: 'Test Schedule', icon: CalendarDays, label: 'Test Schedule' },
-    { id: 'Cancelled', icon: Ban, label: 'Cancelled' },
     { id: 'Upload Results', icon: UploadCloud, label: 'Upload Results' },
+    { id: 'Cancelled', icon: Ban, label: 'Cancelled' },
     { id: 'Lab Schedule', icon: Calendar, label: 'Schedule' },
-    { id: 'Payments', icon: ClipboardList, label: 'Payments' },
-    { id: 'Notifications', icon: Bell, label: 'Notifications', badge: unreadCount },
+    { id: 'Payments', icon: DollarSign, label: 'Payments' },
     { id: 'Tests & Pricing', icon: FlaskConical, label: 'Tests & Pricing' },
+    { id: 'Analytics', icon: BarIcon, label: 'Analytics Report' },
     { id: 'Settings', icon: Settings, label: 'Settings' }
   ];
 
@@ -220,7 +300,110 @@ export default function LabDashboard() {
   };
 
   const handleLogout = () => {
-    navigate('/logout');
+    logout();
+  };
+
+  const handleExportCSV = () => {
+    try {
+      const headers = ['ID', 'Patient', 'Test', 'Date', 'Amount', 'Status', 'Type'];
+      const data = appointments.map(a => [
+        a.id,
+        `${a.user?.first_name || ''} ${a.user?.last_name || ''}`.trim() || a.user?.username || 'N/A',
+        a.test_details?.map(t => t.name).join('; ') || 'N/A',
+        a.date ? new Date(a.date).toLocaleDateString() : 'N/A',
+        a.amount || '0',
+        a.status,
+        a.is_home_collection ? 'Home' : 'Lab'
+      ]);
+
+      const csvContent = [headers, ...data].map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `lab_analytics_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('CSV Exported successfully');
+    } catch (err) {
+      console.error('CSV Export Error:', err);
+      showToast('Failed to export CSV', 'error');
+    }
+  };
+
+  const handleGeneratePDF = async () => {
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageHeight = doc.internal.pageSize.height;
+      
+      // Header
+      doc.setFillColor(79, 70, 229); // brand-600
+      doc.rect(0, 0, 210, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text(profile?.name || 'Lab Analytics Report', 15, 20);
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 15, 30);
+      
+      // Summary Metrics
+      doc.setTextColor(51, 65, 85);
+      doc.setFontSize(16);
+      doc.text('Key Performance Indicators', 15, 55);
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Tests Completed: ${analytics.totalDone}`, 15, 65);
+      doc.text(`Total Revenue: INR ${analytics.revenue.toLocaleString()}`, 15, 72);
+      doc.text(`Pending Requests: ${pendingRequests.length}`, 15, 79);
+      doc.text(`Home Collection Ratio: ${Math.round((analytics.homeStats[0].value / (appointments.length || 1)) * 100)}%`, 15, 86);
+      
+      // Popular Tests
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Top 5 Diagnostic Tests', 15, 105);
+      
+      let yPos = 115;
+      analytics.popularTests.forEach((test, i) => {
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${i+1}. ${test.name}`, 15, yPos);
+        doc.text(`${test.count} Orders`, 160, yPos);
+        yPos += 8;
+      });
+
+      // Daily Trend Summary
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Recent Activity Trend', 15, 165);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Date', 15, 175);
+      doc.text('Tests', 80, 175);
+      doc.text('Revenue', 140, 175);
+      
+      yPos = 182;
+      analytics.dailyTrend.slice(-7).forEach(day => {
+        doc.setFont('helvetica', 'normal');
+        doc.text(day.name, 15, yPos);
+        doc.text(day.tests.toString(), 80, yPos);
+        doc.text(`INR ${day.revenue.toLocaleString()}`, 140, yPos);
+        yPos += 7;
+      });
+
+      doc.setFontSize(9);
+      doc.setTextColor(148, 163, 184);
+      doc.text('System generated diagnostic report. Confidential.', 15, pageHeight - 10);
+      
+      doc.save(`Lab_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      showToast('PDF Report generated successfully');
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+      showToast('Failed to generate PDF', 'error');
+    }
   };
 
   const handleRegisterHours = async (e) => {
@@ -554,8 +737,12 @@ export default function LabDashboard() {
                         >
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                             <div className="flex items-center gap-4 min-w-[180px]">
-                              <div className="w-12 h-12 rounded-2xl bg-brand-50 dark:bg-slate-950 text-brand-600 flex items-center justify-center font-black">
-                                {getPatientName(apt.user).charAt(0)}
+                              <div className="w-12 h-12 rounded-2xl bg-brand-50 dark:bg-slate-950 text-brand-600 flex items-center justify-center font-black overflow-hidden border border-brand-100 dark:border-slate-800">
+                                {apt.user?.avatar_url ? (
+                                  <img src={apt.user.avatar_url} className="w-full h-full object-cover" alt="Patient" />
+                                ) : (
+                                  getPatientName(apt.user).charAt(0)
+                                )}
                               </div>
                               <div>
                                 <p className="font-black text-slate-900 dark:text-white leading-tight">{getPatientName(apt.user)}</p>
@@ -661,13 +848,15 @@ export default function LabDashboard() {
                       <div key={apt.id} className="p-6 hover:bg-brand-50 dark:bg-slate-950 transition-colors flex items-center justify-between group">
                         <div className="flex items-center gap-4">
                           <img 
-                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${getPatientName(apt.user)}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                            className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 shadow-sm transition-transform group-hover:scale-110"
+                            src={apt.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${getPatientName(apt.user)}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                            className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 shadow-sm transition-transform group-hover:scale-110 object-cover"
                             alt={getPatientName(apt.user)}
                           />
                           <div>
                             <p className="font-bold text-slate-900 dark:text-white text-sm">{getPatientName(apt.user)}</p>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">{new Date(apt.date).toLocaleDateString()}</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
+                              {new Date(apt.date).toLocaleDateString()} • {new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
                           </div>
                         </div>
                         <Button 
@@ -703,13 +892,15 @@ export default function LabDashboard() {
                       <div key={apt.id} className="p-6 hover:bg-brand-50 dark:bg-slate-950 transition-colors flex items-center justify-between">
                         <div className="flex items-center gap-4">
                           <img 
-                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${getPatientName(apt.user)}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
-                            className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 shadow-sm"
+                            src={apt.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${getPatientName(apt.user)}&backgroundColor=b6e3f4,c0aede,d1d4f9`} 
+                            className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-slate-950 border border-brand-50 dark:border-slate-800 shadow-sm object-cover"
                             alt={getPatientName(apt.user)}
                           />
                           <div>
                             <p className="font-bold text-slate-900 dark:text-white text-sm">{getPatientName(apt.user)}</p>
-                            <p className="text-[10px] text-brand-500 font-bold uppercase tracking-widest">{new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            <p className="text-[10px] text-brand-500 font-bold uppercase tracking-widest">
+                              {new Date(apt.date).toLocaleDateString()} • {new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
                           </div>
                         </div>
                         <Badge className="bg-amber-50 text-amber-600 border-amber-100 uppercase text-[9px] font-black">Scheduled</Badge>
@@ -742,8 +933,6 @@ export default function LabDashboard() {
                          <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Patient Profile</th>
                          <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Requested Test</th>
                          <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Requested By</th>
-                         <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Date Assigned</th>
-                         <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Payment</th>
                          <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 text-right">Actions</th>
                        </tr>
                      </thead>
@@ -771,19 +960,7 @@ export default function LabDashboard() {
                                <Stethoscope className="w-4 h-4 text-emerald-500" /> {apt.test_request_details?.doctor_name || 'Direct Booking'}
                              </div>
                            </td>
-                           <td className="px-8 py-5 text-sm text-slate-500 dark:text-slate-400 font-medium">
-                              {new Date(apt.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
-                           </td>
-                           <td className="px-8 py-5">
-                              <div className="flex flex-col">
-                                 <Badge className={`w-fit text-[10px] font-black uppercase tracking-widest ${apt.is_paid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                    {apt.type === 'TEST_REQUEST' ? 'Awaiting Booking' : (apt.is_paid ? 'Paid' : 'Unpaid')}
-                                 </Badge>
-                                 <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">
-                                   {apt.type === 'TEST_REQUEST' ? 'N/A' : `₹${apt.amount} • ${apt.payment_mode === 'ONLINE' ? 'Online' : 'At Lab'}`}
-                                 </span>
-                              </div>
-                           </td>
+
                            <td className="px-8 py-5 text-right">
                               <div className="flex items-center justify-end gap-2">
                                  <Button 
@@ -800,7 +977,13 @@ export default function LabDashboard() {
                                    Cancel
                                  </Button>
                                 <Button 
-                                  onClick={() => setSchedulingApt(apt)}
+                                  onClick={() => {
+                                    setSchedulingApt(apt);
+                                    setScheduleData({
+                                      date: apt.date ? new Date(apt.date).toISOString().split('T')[0] : '',
+                                      time: apt.date ? new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : (apt.time_slot || '')
+                                    });
+                                  }}
                                   className="bg-brand-600 hover:bg-brand-700 text-white font-black px-6 rounded-xl shadow-lg shadow-brand-500/20 transition-transform active:scale-95"
                                 >
                                   Accept & Schedule
@@ -826,6 +1009,302 @@ export default function LabDashboard() {
              </div>
           )}
 
+           {/* TAB: ANALYTICS REPORT */}
+           {activeTab === 'Analytics' && (
+             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Diagnostic Intelligence</h2>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">Real-time performance analytics and growth metrics</p>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-1 bg-brand-50 dark:bg-slate-950 p-1 rounded-2xl border border-brand-100/50">
+                      <button 
+                        onClick={() => setAnalyticsTab('Overview')}
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${analyticsTab === 'Overview' ? 'bg-white dark:bg-slate-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Overview
+                      </button>
+                      <button 
+                        onClick={() => setAnalyticsTab('Pipeline')}
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${analyticsTab === 'Pipeline' ? 'bg-white dark:bg-slate-900 text-brand-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Booking Pipeline
+                      </button>
+                    </div>
+                    <div className="h-8 w-px bg-slate-200" />
+                    <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleExportCSV}
+                      className="rounded-xl font-bold text-xs border-slate-200 hover:bg-slate-50"
+                    >
+                      Export CSV
+                    </Button>
+                    <Button 
+                      onClick={handleGeneratePDF}
+                      className="rounded-xl font-black text-xs bg-brand-600 text-white hover:bg-brand-700 shadow-lg shadow-brand-500/20"
+                    >
+                      Generate PDF Report
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {analyticsTab === 'Overview' ? (
+                  <>
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {[
+                        { label: "Total Tests Done", value: analytics.totalDone, icon: FlaskConical, color: "text-brand-600", bg: "bg-brand-50", trend: "+12.5%", trendUp: true },
+                        { label: "Gross Revenue", value: `₹${analytics.revenue.toLocaleString()}`, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", trend: "+8.2%", trendUp: true },
+                        { label: "Pending Orders", value: pendingRequests.length, icon: Clock, color: "text-amber-600", bg: "bg-amber-50", trend: "-3.1%", trendUp: false },
+                        { label: "Home Collections", value: analytics.homeStats[0].value, icon: MapPin, color: "text-purple-600", bg: "bg-purple-50", trend: "+18%", trendUp: true }
+                      ].map((kpi, idx) => (
+                        <div key={idx} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+                          <div className={`absolute top-0 right-0 w-24 h-24 ${kpi.bg} opacity-20 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2`} />
+                          <div className="flex justify-between items-start relative z-10">
+                            <div className={`w-12 h-12 rounded-2xl ${kpi.bg} ${kpi.color} flex items-center justify-center shadow-sm`}>
+                              <kpi.icon className="w-6 h-6" />
+                            </div>
+                            <Badge className={`border-0 font-black text-[9px] px-2 ${kpi.trendUp ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                              {kpi.trend}
+                            </Badge>
+                          </div>
+                          <div className="mt-6">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{kpi.label}</p>
+                            <h4 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{kpi.value}</h4>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                      {/* Revenue & Trend Chart */}
+                      <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm">
+                        <div className="flex items-center justify-between mb-8">
+                          <div>
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white">Daily Revenue & Test Trend</h3>
+                            <p className="text-xs font-bold text-slate-400 mt-1">Growth trajectory over the last 10 days</p>
+                          </div>
+                          <select className="bg-slate-50 border-0 rounded-xl px-4 py-2 text-[10px] font-black uppercase outline-none">
+                            <option>Last 10 Days</option>
+                            <option>Last 30 Days</option>
+                          </select>
+                        </div>
+                        <div className="h-[350px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={analytics.dailyTrend}>
+                              <defs>
+                                <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorTests" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis 
+                                dataKey="name" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} 
+                                dy={10}
+                              />
+                              <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} 
+                              />
+                              <Tooltip 
+                                contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '20px' }}
+                                itemStyle={{ fontWeight: 800, fontSize: '12px' }}
+                              />
+                              <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                              <Area type="monotone" dataKey="tests" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorTests)" />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Most Popular Tests */}
+                      <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm">
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white mb-6">Popular Procedures</h3>
+                        <div className="space-y-6">
+                          {analytics.popularTests.map((test, idx) => (
+                            <div key={idx} className="space-y-2">
+                              <div className="flex justify-between items-end">
+                                <span className="text-xs font-black text-slate-700 dark:text-slate-300 truncate max-w-[200px]">{test.name}</span>
+                                <span className="text-[10px] font-black text-brand-600 bg-brand-50 px-2 py-0.5 rounded-lg">{test.count} Orders</span>
+                              </div>
+                              <div className="w-full h-2 bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${(test.count / analytics.popularTests[0].count) * 100}%` }}
+                                  transition={{ duration: 1, delay: idx * 0.1 }}
+                                  className="h-full bg-brand-500 rounded-full"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                          {analytics.popularTests.length === 0 && (
+                            <div className="py-20 text-center">
+                              <TrendingUp className="w-10 h-10 text-slate-200 mx-auto mb-4" />
+                              <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">No order data yet</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       {/* Status Distribution */}
+                       <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm flex flex-col items-center">
+                          <h3 className="text-lg font-black text-slate-900 dark:text-white self-start mb-2">Order Distribution</h3>
+                          <p className="text-xs font-bold text-slate-400 self-start mb-8">Pending vs Completed vs Cancelled</p>
+                          <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={analytics.statusData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={60}
+                                  outerRadius={80}
+                                  paddingAngle={5}
+                                  dataKey="value"
+                                >
+                                  {analytics.statusData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                                <Tooltip />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="flex gap-6 mt-4">
+                            {analytics.statusData.map((s, i) => (
+                              <div key={i} className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color }} />
+                                <span className="text-[10px] font-black uppercase text-slate-500">{s.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                       </div>
+
+                       {/* Visit Mode Stats */}
+                       <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm">
+                          <h3 className="text-lg font-black text-slate-900 dark:text-white mb-2">Visit Channel Stats</h3>
+                          <p className="text-xs font-bold text-slate-400 mb-8">Home Collection vs Lab Visits</p>
+                          <div className="space-y-10 py-6">
+                             {[
+                               { label: "Lab Facility Visits", count: analytics.homeStats[1].value, icon: Building2, color: "text-blue-500", bg: "bg-blue-50" },
+                               { label: "Home Sample Collections", count: analytics.homeStats[0].value, icon: MapPin, color: "text-purple-500", bg: "bg-purple-50" }
+                             ].map((item, i) => (
+                               <div key={i} className="flex items-center gap-6">
+                                  <div className={`w-14 h-14 rounded-2xl ${item.bg} ${item.color} flex items-center justify-center`}>
+                                    <item.icon className="w-6 h-6" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex justify-between items-end mb-2">
+                                      <span className="text-sm font-black text-slate-900 tracking-tight">{item.label}</span>
+                                      <span className="text-xl font-black text-slate-900">{item.count}</span>
+                                    </div>
+                                    <div className="w-full h-3 bg-slate-50 rounded-full overflow-hidden">
+                                      <motion.div 
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${(item.count / Math.max(appointments.length, 1)) * 100}%` }}
+                                        className={`h-full ${item.color.replace('text', 'bg')} rounded-full`}
+                                      />
+                                    </div>
+                                  </div>
+                               </div>
+                             ))}
+                          </div>
+                       </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
+                    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+                      <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white">Fulfillment Pipeline</h3>
+                        <div className="relative">
+                          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input 
+                            type="text"
+                            placeholder="Search patient or test..."
+                            className="h-12 pl-12 pr-6 bg-brand-50 dark:bg-slate-950 border-0 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-brand-500/20 w-full md:w-64"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-x-auto">
+                        <table className="w-full text-left whitespace-nowrap">
+                          <thead>
+                            <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
+                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Order Ref</th>
+                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Patient</th>
+                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Tests</th>
+                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Schedule</th>
+                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Finance</th>
+                              <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                            {appointments.length === 0 ? (
+                              <tr>
+                                <td colSpan="6" className="py-20 text-center">
+                                   <History className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                                   <p className="font-bold text-slate-400 italic">No records in pipeline.</p>
+                                </td>
+                              </tr>
+                            ) : (
+                              [...appointments].sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)).map(apt => (
+                                <tr key={apt.id} className="hover:bg-brand-50/50 transition-colors">
+                                  <td className="px-8 py-5 text-xs font-black">#LB-{apt.id}</td>
+                                  <td className="px-8 py-5">
+                                    <p className="font-black text-slate-900 dark:text-white text-sm">{getPatientName(apt.user)}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{apt.user?.phone}</p>
+                                  </td>
+                                  <td className="px-8 py-5">
+                                    <div className="flex flex-wrap gap-1">
+                                      {apt.test_details?.map((t, idx) => (
+                                        <Badge key={idx} className="bg-slate-100 text-slate-600 text-[8px] font-black">{t.name}</Badge>
+                                      ))}
+                                    </div>
+                                  </td>
+                                  <td className="px-8 py-5">
+                                    <p className="text-xs font-bold text-slate-700">{apt.date ? new Date(apt.date).toLocaleDateString() : 'N/A'}</p>
+                                    <p className="text-[10px] text-slate-400 font-black">{apt.time_slot}</p>
+                                  </td>
+                                  <td className="px-8 py-5">
+                                    <p className="font-black text-slate-900">₹{apt.amount}</p>
+                                    <span className={`text-[9px] font-black ${apt.is_paid ? 'text-emerald-500' : 'text-amber-500'}`}>{apt.is_paid ? 'PAID' : 'DUE'}</span>
+                                  </td>
+                                  <td className="px-8 py-5">
+                                    <Badge className={`uppercase text-[9px] font-black ${
+                                      apt.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600' :
+                                      apt.status === 'CANCELLED' ? 'bg-rose-50 text-rose-600' :
+                                      'bg-brand-50 text-brand-600'
+                                    }`}>
+                                      {apt.status}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+             </div>
+           )}
+
           {/* TAB: TEST SCHEDULE */}
           {activeTab === 'Test Schedule' && (
              <div className="animate-in slide-in-from-bottom-8 duration-700 bg-white dark:bg-slate-900 border border-brand-50 dark:border-slate-800 rounded-[2rem] shadow-sm overflow-hidden flex flex-col h-full min-h-[500px]">
@@ -834,9 +1313,94 @@ export default function LabDashboard() {
                     <h3 className="text-xl font-black text-slate-900 dark:text-white">Active Test Schedule</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">Manage scheduled patients and monitor diagnostic progress.</p>
                   </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                    <input type="text" placeholder="Filter schedule..." className="pl-10 pr-4 py-2 bg-brand-50 dark:bg-slate-950 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-brand-50 dark:border-slate-800" />
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-600" />
+                      <input 
+                        type="date" 
+                        value={selectedPreviewDate}
+                        onChange={(e) => setSelectedPreviewDate(e.target.value)}
+                        className="pl-10 pr-4 py-2 bg-brand-50 dark:bg-slate-950 border border-brand-100 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                      <input type="text" placeholder="Filter schedule..." className="pl-10 pr-4 py-2 bg-brand-50 dark:bg-slate-950 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-brand-50 dark:border-slate-800" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Daily Timeline Preview */}
+                <div className="px-8 pb-6">
+                  <div className="bg-brand-50/50 dark:bg-slate-950/50 rounded-3xl p-6 border border-brand-50 dark:border-slate-800">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Daily Timeline: {new Date(selectedPreviewDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</h4>
+                      <div className="flex gap-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-brand-600" />
+                          <span className="text-[10px] font-bold text-slate-500">Booked</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-slate-200" />
+                          <span className="text-[10px] font-bold text-slate-500">Available</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                      {(() => {
+                        const dayOfWeek = new Date(selectedPreviewDate).getDay();
+                        if (dayOfWeek === 0) { // Sunday
+                          return (
+                            <div className="col-span-full py-12 flex flex-col items-center justify-center bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200">
+                               <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center mb-3">
+                                  <X className="w-6 h-6" />
+                               </div>
+                               <h5 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Facility Closed</h5>
+                               <p className="text-xs text-slate-400 font-bold mt-1">Sundays are non-operational days.</p>
+                            </div>
+                          );
+                        }
+
+                        const slots = [];
+                        let current = new Date();
+                        current.setHours(9, 0, 0, 0);
+                        const end = new Date();
+                        end.setHours(17, 0, 0, 0);
+                        
+                        while (current <= end) {
+                          slots.push(current.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                          current.setMinutes(current.getMinutes() + 15);
+                        }
+                        
+                        return slots.map(slot => {
+                          const booking = scheduledTests.find(t => 
+                            new Date(t.date).toISOString().split('T')[0] === selectedPreviewDate && 
+                            (t.time_slot === slot || new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }).includes(slot.split(' ')[0]))
+                          );
+                          
+                          return (
+                            <div 
+                              key={slot}
+                              className={`p-3 rounded-xl border transition-all ${booking ? 'bg-white dark:bg-slate-900 border-brand-300 shadow-md ring-2 ring-brand-500/10' : 'border-slate-100 dark:border-slate-800 opacity-40'}`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[9px] font-black text-brand-600">{slot}</span>
+                                {booking && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                              </div>
+                              {booking ? (
+                                <div className="space-y-0.5">
+                                  <p className="text-[10px] font-black text-slate-900 dark:text-white truncate">{getPatientName(booking.user)}</p>
+                                  <p className="text-[8px] font-bold text-slate-400 truncate uppercase">{booking.test_details?.[0]?.name || 'Lab Test'}</p>
+                                </div>
+                              ) : (
+                                <p className="text-[9px] font-bold text-slate-300 italic">Free</p>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
                 </div>
                 
@@ -858,12 +1422,14 @@ export default function LabDashboard() {
                              <div className="font-bold text-slate-900 dark:text-white">{getPatientName(apt.user)}</div>
                            </td>
                            <td className="px-8 py-5 text-sm text-slate-600 font-medium">{apt.test_details?.map(t => t.name).join(', ') || 'Diagnostic'}</td>
-                           <td className="px-8 py-5">
-                             <div className="flex items-center gap-2 text-slate-600 font-medium text-sm">
-                               <Clock className="w-4 h-4 text-amber-500" />
-                               {new Date(apt.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                             </div>
-                           </td>
+                            <td className="px-8 py-5">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-900 dark:text-white">{new Date(apt.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                <span className="text-[10px] text-brand-600 font-black uppercase tracking-widest flex items-center gap-1 mt-1">
+                                  <Clock className="w-3 h-3" /> {new Date(apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            </td>
                            <td className="px-8 py-5">
                              <Badge className="bg-amber-50 text-amber-600 border border-amber-200/50 text-[10px] uppercase font-black px-3 py-1">Scheduled</Badge>
                            </td>
@@ -1015,7 +1581,7 @@ export default function LabDashboard() {
              <div className="animate-in slide-in-from-bottom-8 duration-700 bg-white dark:bg-slate-900 border border-brand-50 dark:border-slate-800 rounded-[2rem] shadow-sm overflow-hidden flex flex-col h-full min-h-[500px]">
                <div className="p-8 border-b border-slate-50 flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white">Authenticated Digital Reports</h3>
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Authenticated Digital Reports</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">Verified diagnostic findings ready for distribution.</p>
                   </div>
                   <Badge className="bg-emerald-50 text-emerald-700 border-0 font-bold px-4 py-2 text-sm">{testResults.length} Reports</Badge>
@@ -1553,6 +2119,7 @@ export default function LabDashboard() {
              </div>
            )}
 
+
            {/* TAB: SETTINGS */}
            {activeTab === 'Settings' && (
              <div className="max-w-4xl mx-auto animate-in slide-in-from-bottom-8 duration-700 pb-20">
@@ -1562,9 +2129,32 @@ export default function LabDashboard() {
                    e.preventDefault();
                    if (!profile?.id) return;
                    try {
-                     const res = await api.patch(`users/labs/${profile.id}/`, profile);
+                     const payload = {
+                      name: profile.name,
+                      owner_name: profile.owner_name,
+                      city: profile.city,
+                      address: profile.address,
+                      pincode: profile.pincode,
+                      payment_type: profile.payment_type,
+                      advance_payment: profile.advance_payment,
+                      home_collection_available: profile.home_collection_available,
+                      home_collection_charge: profile.home_collection_charge,
+                      website: profile.website
+                    };
+                     if (passwordForm.new_password) {
+                        if (passwordForm.new_password !== passwordForm.confirm_password) {
+                          showToast("Passwords do not match", "error");
+                          return;
+                        }
+                        await api.patch('users/profiles/update_me/', {
+                          new_password: passwordForm.new_password,
+                          confirm_password: passwordForm.confirm_password
+                        });
+                     }
+                    const res = await api.patch(`users/labs/${profile.id}/`, payload);
                      setProfile(res.data);
-                     showToast("Settings updated successfully");
+                     setPasswordForm({ new_password: '', confirm_password: '' });
+                     showToast("Facility Profile & Security updated successfully");
                    } catch (err) {
                      showToast("Failed to update settings", "error");
                    }
@@ -1635,6 +2225,34 @@ export default function LabDashboard() {
                        </div>
                      )}
                    </div>
+
+                    <div className="md:col-span-2 pt-6 border-t border-slate-50 dark:border-slate-800">
+                       <h4 className="text-sm font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-brand-600" /> Security Credentials
+                       </h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                             <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">New Password</Label>
+                             <Input 
+                                type="password"
+                                value={passwordForm.new_password}
+                                onChange={(e) => setPasswordForm({...passwordForm, new_password: e.target.value})}
+                                className="h-14 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm"
+                                placeholder="Leave blank to keep current"
+                             />
+                          </div>
+                          <div className="space-y-2">
+                             <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 ml-1">Confirm New Password</Label>
+                             <Input 
+                                type="password"
+                                value={passwordForm.confirm_password}
+                                onChange={(e) => setPasswordForm({...passwordForm, confirm_password: e.target.value})}
+                                className="h-14 bg-brand-50 dark:bg-slate-950/50 border-brand-50 dark:border-slate-800 rounded-2xl font-black text-slate-900 dark:text-white focus:bg-white dark:bg-slate-900 focus:ring-4 focus:ring-brand-500/5 transition-all text-sm"
+                                placeholder="Repeat new password"
+                             />
+                          </div>
+                       </div>
+                    </div>
 
                    <Button type="submit" className="w-full h-14 bg-brand-600 hover:bg-brand-700 text-white font-black rounded-2xl">
                      Save Changes
@@ -1719,14 +2337,32 @@ export default function LabDashboard() {
       {schedulingApt && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <header className="p-8 border-b border-slate-50 flex items-center justify-between bg-brand-50 dark:bg-slate-950/50">
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Set Appointment Time</h3>
-                <p className="text-[10px] font-black uppercase tracking-widest text-brand-600 mt-1">Patient: {getPatientName(schedulingApt.user)}</p>
+            <header className="p-8 border-b border-slate-50 flex flex-col bg-brand-50 dark:bg-slate-950/50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Confirm Appointment</h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-600 mt-1">Patient: {getPatientName(schedulingApt.user)}</p>
+                </div>
+                <button onClick={() => setSchedulingApt(null)} className="p-2 hover:bg-white rounded-full transition-colors">
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
               </div>
-              <button onClick={() => setSchedulingApt(null)} className="p-2 hover:bg-white rounded-full transition-colors">
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
+              
+              <div className="mt-6 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-brand-100 shadow-sm">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Patient Requested</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-brand-600" />
+                    <span className="text-sm font-black text-slate-700 dark:text-slate-300">{schedulingApt.date ? new Date(schedulingApt.date).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-brand-600" />
+                    <span className="text-sm font-black text-slate-700 dark:text-slate-300">
+                      {schedulingApt.date ? new Date(schedulingApt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (schedulingApt.time_slot || 'Any Time')}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </header>
 
             <form onSubmit={handleScheduleConfirm} className="p-8 space-y-6">
@@ -1742,9 +2378,10 @@ export default function LabDashboard() {
               </div>
 
               <div className="space-y-2">
-                <Label className="uppercase text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500">Pick Time Slot</Label>
+                <Label className="uppercase text-[10px] font-black tracking-widest text-slate-400 dark:text-slate-500">Confirm Time Slot</Label>
                 <Input 
-                  type="time" 
+                  type="text" 
+                  placeholder="e.g. 09:00 AM"
                   required 
                   value={scheduleData.time}
                   onChange={e => setScheduleData({...scheduleData, time: e.target.value})}
@@ -1875,8 +2512,11 @@ export default function LabDashboard() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl border border-brand-50 dark:border-slate-800 bg-white dark:bg-slate-900">
-                     <p className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1">Target Date</p>
-                     <p className="font-bold text-slate-900 dark:text-white">{selectedAppointment.date ? new Date(selectedAppointment.date).toLocaleDateString() : 'TBD'}</p>
+                     <p className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1">Schedule</p>
+                     <p className="font-bold text-slate-900 dark:text-white">
+                        {selectedAppointment.date ? new Date(selectedAppointment.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+                        {selectedAppointment.date && <span className="text-slate-400 font-medium ml-2">at {new Date(selectedAppointment.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                     </p>
                   </div>
                   <div className="p-4 rounded-xl border border-brand-50 dark:border-slate-800 bg-white dark:bg-slate-900">
                      <p className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1">Requested By</p>
@@ -1890,6 +2530,8 @@ export default function LabDashboard() {
                         {selectedAppointment.is_paid ? <span className="text-emerald-600">Paid</span> : <span className="text-amber-600">Pending</span>}
                         <span className="text-slate-300">|</span>
                         ₹{selectedAppointment.amount || 0}
+                        <span className="text-slate-300">|</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{selectedAppointment.payment_mode === 'ONLINE' ? 'Online' : 'At Lab'}</span>
                      </p>
                   </div>
                   <div className="p-4 rounded-xl border border-brand-50 dark:border-slate-800 bg-white dark:bg-slate-900">

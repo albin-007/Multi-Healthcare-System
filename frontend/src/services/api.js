@@ -73,7 +73,7 @@ api.interceptors.response.use(
         const isPublicPage = publicPages.includes(currentPath || '/');
 
         if (!isPublicPage) {
-          window.location.href = '/login';
+          window.location.href = '/';
         } else {
           // If on a public page, just reload to clear any stale auth state in context
           window.location.reload();

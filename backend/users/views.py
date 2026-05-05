@@ -7,6 +7,10 @@ from django.http import FileResponse, Http404
 from django.conf import settings
 import os
 
+from django.db.models import Sum
+from appointments.models import Appointment
+from payments.models import Payment
+
 from .models import User, Clinic, Doctor, Complaint, Feedback, Lab, VerificationDocument, Notification, LabTest, TestRequest
 from .serializers import (
     RegisterSerializer, UserSerializer, ClinicSerializer,
@@ -32,10 +36,51 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['patch', 'put'], parser_classes=[MultiPartParser, FormParser])
     def update_me(self, request):
-        serializer = self.get_serializer(request.user, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
+        try:
+            user = request.user
+            data = request.data
+            
+            # Handle Password Update
+            new_password = data.get('new_password')
+            if new_password:
+                confirm_password = data.get('confirm_password')
+                if not confirm_password:
+                    return Response({"detail": "Please confirm your new password"}, status=status.HTTP_400_BAD_REQUEST)
+                if new_password != confirm_password:
+                    return Response({"detail": "Passwords do not match"}, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Use Django's built-in password validation if desired
+                try:
+                    from django.contrib.auth.password_validation import validate_password
+                    validate_password(new_password, user)
+                except Exception as e:
+                    return Response({"detail": list(e.messages) if hasattr(e, 'messages') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                
+                user.set_password(new_password)
+                user.save()
+
+            # Handle Facility Profile Updates for Clinic/Lab roles
+            if user.role == User.Role.CLINIC and hasattr(user, 'clinic_profile'):
+                profile = user.clinic_profile
+                profile.name = data.get('name', profile.name)
+                profile.address = data.get('address', profile.address)
+                profile.pincode = data.get('pincode', profile.pincode)
+                profile.save()
+            elif user.role == User.Role.LAB and hasattr(user, 'lab_profile'):
+                profile = user.lab_profile
+                profile.name = data.get('name', profile.name)
+                profile.address = data.get('address', profile.address)
+                profile.pincode = data.get('pincode', profile.pincode)
+                profile.save()
+
+            serializer = self.get_serializer(user, data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+        except serializers.ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
     def approve(self, request, pk=None):
@@ -378,3 +423,60 @@ class TestRequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         doctor = getattr(self.request.user, 'doctor_profile', None)
         serializer.save(doctor=doctor)
+
+class AdminDashboardDataView(generics.GenericAPIView):
+    """Provides consolidated stats, payments, and appointments for the Admin Dashboard."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request, *args, **kwargs):
+        total_users = User.objects.filter(role=User.Role.USER).count()
+        total_doctors = Doctor.objects.count()
+        total_clinics = Clinic.objects.count()
+        total_labs = Lab.objects.count()
+        total_appointments = Appointment.objects.count()
+        total_lab_tests = LabTest.objects.count()
+
+        total_revenue = Payment.objects.filter(payment_status='SUCCESS').aggregate(Sum('amount'))['amount__sum'] or 0
+        commission_rate = getattr(settings, 'PLATFORM_COMMISSION_RATE', 0.10)
+        commission_earned = float(total_revenue) * commission_rate
+
+        recent_payments = Payment.objects.order_by('-created_at')[:20]
+        payments_data = []
+        for p in recent_payments:
+            payments_data.append({
+                'payment_id': p.payment_id,
+                'amount': p.amount,
+                'status': p.payment_status,
+                'user_name': p.user.username if p.user else 'Unknown',
+                'date': p.created_at,
+                'method': p.payment_method
+            })
+
+        recent_appointments = Appointment.objects.order_by('-date')[:50]
+        appointments_data = []
+        for a in recent_appointments:
+            appointments_data.append({
+                'id': a.id,
+                'user_name': a.user.username,
+                'entity_name': a.entity_name,
+                'date': a.date,
+                'status': a.status,
+                'amount': a.amount,
+                'is_paid': a.is_paid
+            })
+
+        return Response({
+            'stats': {
+                'total_users': total_users,
+                'total_doctors': total_doctors,
+                'total_clinics': total_clinics,
+                'total_labs': total_labs,
+                'total_appointments': total_appointments,
+                'total_lab_tests': total_lab_tests,
+                'total_revenue': total_revenue,
+                'commission_earned': commission_earned,
+            },
+            'recent_payments': payments_data,
+            'recent_appointments': appointments_data
+        })
+
