@@ -57,7 +57,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     from django.contrib.auth.password_validation import validate_password
                     validate_password(new_password, user)
                 except Exception as e:
-                    return Response({"detail": list(e.messages) if hasattr(e, 'messages') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"detail": list(e.messages) if hasattr(e, 'messages') else str(e)}, status=status.HTTP_400_BAD_REQUEST) # type: ignore
                 
                 user.set_password(new_password)
                 user.save()
@@ -149,7 +149,7 @@ class ClinicViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        user = self.request.user
+        user: User = self.request.user # type: ignore
         
         # Admin sees everything
         if not user.is_anonymous and user.role == 'ADMIN':
@@ -165,7 +165,7 @@ class ClinicViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         instance = serializer.save(admin_user=self.request.user)
         # Handle verification document if uploaded during initialization
-        doc = self.request.FILES.get('document')
+        doc = self.request.FILES.get('document') # type: ignore
         if doc:
             VerificationDocument.objects.create(
                 entity_type=VerificationDocument.EntityType.CLINIC,
@@ -184,7 +184,7 @@ class DoctorViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        user = self.request.user
+        user: User = self.request.user # type: ignore
         
         # Admin sees all doctors
         if not user.is_anonymous and user.role == 'ADMIN':
@@ -198,7 +198,8 @@ class DoctorViewSet(viewsets.ModelViewSet):
         return Doctor.objects.filter(clinic__admin_user__status=User.Status.APPROVED)
 
     def perform_create(self, serializer):
-        if self.request.user.role == 'CLINIC':
+        user: User = self.request.user # type: ignore
+        if user.role == 'CLINIC':
             try:
                 clinic = Clinic.objects.get(admin_user=self.request.user)
                 serializer.save(clinic=clinic)
@@ -241,7 +242,7 @@ class LabViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        user = self.request.user
+        user: User = self.request.user # type: ignore
         
         # Admin sees everything
         if not user.is_anonymous and user.role == 'ADMIN':
@@ -257,7 +258,7 @@ class LabViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         instance = serializer.save(admin_user=self.request.user)
         # Handle verification document if uploaded during initialization
-        doc = self.request.FILES.get('document')
+        doc = self.request.FILES.get('document') # type: ignore
         if doc:
             VerificationDocument.objects.create(
                 entity_type=VerificationDocument.EntityType.LAB,
@@ -302,13 +303,13 @@ class LabTestViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         lab_id = self.request.query_params.get('lab_id')
-        user = self.request.user
+        user: User = self.request.user # type: ignore
 
         if lab_id:
             # If a specific lab is requested, ensure it's either the owner's lab, 
             # or the lab is approved.
             qs = LabTest.objects.filter(lab_id=lab_id)
-            if not user.is_anonymous and (user.role == 'ADMIN' or (user.role == 'LAB' and user.lab_profile.id == int(lab_id))):
+            if not user.is_anonymous and (user.role == 'ADMIN' or (user.role == 'LAB' and user.lab_profile.id == int(lab_id))): # type: ignore
                 return qs
             return qs.filter(lab__admin_user__status=User.Status.APPROVED)
         
@@ -322,7 +323,8 @@ class LabTestViewSet(viewsets.ModelViewSet):
         return LabTest.objects.filter(lab__admin_user__status=User.Status.APPROVED)
 
     def perform_create(self, serializer):
-        if self.request.user.role == 'LAB':
+        user: User = self.request.user # type: ignore
+        if user.role == 'LAB':
             try:
                 lab = Lab.objects.get(admin_user=self.request.user)
                 serializer.save(lab=lab)
@@ -370,7 +372,7 @@ class VerificationDocumentViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
 
     def get_queryset(self):
-        user = self.request.user
+        user: User = self.request.user # type: ignore
         qs = VerificationDocument.objects.all().order_by('-uploaded_at')
 
         # Admin can see all
@@ -453,7 +455,7 @@ class TestRequestViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        user = self.request.user
+        user: User = self.request.user # type: ignore
         if user.role == 'DOCTOR':
             doctor = getattr(user, 'doctor_profile', None)
             return TestRequest.objects.filter(doctor=doctor)

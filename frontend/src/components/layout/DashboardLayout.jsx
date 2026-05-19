@@ -60,12 +60,25 @@ export default function DashboardLayout() {
   return (
     <div className={`flex h-screen overflow-hidden ${theme === 'dark' ? 'dark' : ''} bg-brand-50 dark:bg-slate-950 transition-colors duration-500`}>
       
-      {/* Sidebar - Desktop (Fixed) */}
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar - Desktop & Mobile */}
       <motion.aside 
         initial={false}
-        animate={isCollapsed ? 'collapsed' : 'expanded'}
+        animate={isMobileMenuOpen ? 'expanded' : (isCollapsed ? 'collapsed' : 'expanded')}
         variants={sidebarVariants}
-        className="hidden md:flex flex-col bg-brand-600 dark:bg-slate-950 border-r border-white/5 z-50 overflow-hidden text-white"
+        className={`fixed md:relative flex-col bg-brand-600 dark:bg-slate-950 border-r border-white/5 z-50 h-full overflow-hidden text-white transition-transform duration-300 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0 flex' : '-translate-x-full md:flex'}`}
       >
         <div className="h-24 flex items-center px-8 overflow-hidden shrink-0">
           <Link to="/" className="flex items-center gap-3">
@@ -160,11 +173,17 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col min-w-0 bg-brand-50 dark:bg-slate-950 transition-colors duration-500 overflow-hidden">
         
         {/* Top Navbar */}
-        <header className="h-20 bg-white dark:bg-slate-900 border-b border-brand-50 dark:border-slate-800 flex items-center justify-between px-6 md:px-10 sticky top-0 z-40 transition-colors duration-500 shrink-0">
-          <div className="flex items-center gap-4">
+        <header className="h-20 bg-white dark:bg-slate-900 border-b border-brand-50 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 md:px-10 sticky top-0 z-40 transition-colors duration-500 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+              className="md:hidden p-2.5 rounded-xl bg-brand-50 dark:bg-slate-950 text-brand-600 dark:text-teal-400 hover:bg-brand-100 transition-all border border-brand-100 dark:border-slate-800"
+            >
+              <Menu size={20} />
+            </button>
             <button 
               onClick={() => setIsCollapsed(!isCollapsed)} 
-              className="p-2.5 rounded-xl bg-brand-50 dark:bg-slate-950 text-brand-600 dark:text-teal-400 hover:bg-brand-100 transition-all border border-brand-100 dark:border-slate-800"
+              className="hidden md:block p-2.5 rounded-xl bg-brand-50 dark:bg-slate-950 text-brand-600 dark:text-teal-400 hover:bg-brand-100 transition-all border border-brand-100 dark:border-slate-800"
             >
               {isCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
             </button>

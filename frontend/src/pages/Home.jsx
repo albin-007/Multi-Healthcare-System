@@ -625,21 +625,13 @@ export default function Home() {
       `}</style>
 
       {/* ──────────── NAVBAR (fixed, always on top) ──────────── */}
-      <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 48px',
-        background: active === 0 ? 'transparent' : 'rgba(245,242,237,0.92)',
-        backdropFilter: active === 0 ? 'none' : 'blur(20px)',
-        borderBottom: active === 0 ? 'none' : '1px solid rgba(26,60,52,0.08)',
-        transition: 'all .35s ease',
-      }}>
+      <nav className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-6 lg:px-12 py-4 transition-all duration-350 ${active === 0 ? 'bg-transparent' : 'bg-[#F5F2ED]/90 backdrop-blur-xl border-b border-[#1A3C34]/5'}`}>
         <Link to="/" style={{ textDecoration: 'none' }}>
           <Logo size="md" variant="dark" />
         </Link>
 
         {/* Desktop nav links */}
-        <div style={{ display: 'flex', gap: 36 }}>
+        <div className="hidden lg:flex gap-8">
           {SECTIONS.slice(0, 6).map((s, i) => (
             <button
               key={s}
@@ -659,16 +651,16 @@ export default function Home() {
         </div>
 
         {/* CTA */}
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div className="flex items-center gap-3">
           {!isAuthenticated ? (
             <>
-              <Link to="/login" className="btn-outline" style={{ padding: '10px 22px', fontSize: 14 }}>Login</Link>
-              <Link to="/register" className="btn-dark" style={{ padding: '10px 22px', fontSize: 14 }}>
+              <Link to="/login" className="btn-outline hidden sm:flex text-sm px-4 py-2">Login</Link>
+              <Link to="/register" className="btn-dark text-sm px-4 py-2 lg:px-5 lg:py-2.5">
                 Get Started <ArrowRight size={16} />
               </Link>
             </>
           ) : (
-            <Link to={getDashboardPath()} className="btn-dark" style={{ padding: '10px 22px', fontSize: 14 }}>
+            <Link to={getDashboardPath()} className="btn-dark text-sm px-4 py-2 lg:px-5 lg:py-2.5">
               Dashboard <ArrowRight size={16} />
             </Link>
           )}
@@ -704,15 +696,9 @@ export default function Home() {
           {/* glow */}
           <div style={{ position: 'absolute', top: '-20%', right: '-10%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle,rgba(26,60,52,0.08),transparent 70%)', pointerEvents: 'none' }} />
 
-          <div style={{
-            position: 'relative', zIndex: 1, height: '100%',
-            display: 'grid', gridTemplateColumns: '1fr 1fr',
-            alignItems: 'center', gap: 64,
-            padding: '80px 64px 40px',
-            maxWidth: 1280, margin: '0 auto',
-          }}>
+          <div className="relative z-10 h-full flex flex-col lg:grid lg:grid-cols-2 items-center gap-12 lg:gap-16 px-6 lg:px-16 pt-32 pb-16 lg:py-20 max-w-7xl mx-auto overflow-y-auto lg:overflow-visible no-scrollbar">
             {/* LEFT */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            <div className="flex flex-col gap-6 lg:gap-7 w-full order-2 lg:order-1 pb-16 lg:pb-0">
 
               <div className="anim-fadeUp pill" style={{ background: 'rgba(26,60,52,0.07)', border: '1px solid rgba(26,60,52,0.12)', color: '#1A3C34', width: 'fit-content' }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3D7A68', display: 'inline-block', position: 'relative' }}>
@@ -737,16 +723,16 @@ export default function Home() {
                 Book appointments at top-tier clinics, doctors, and diagnostic labs — all from one simple platform.
               </p>
 
-              <div className="anim-fadeUp d3" style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                <Link to="/find-doctors" className="btn-dark" style={{ padding: '14px 32px', fontSize: 16 }}>
+              <div className="anim-fadeUp d3 flex flex-wrap gap-4 mt-2">
+                <Link to="/find-doctors" className="btn-dark text-sm lg:text-base px-6 py-3 lg:px-8 lg:py-3.5">
                   Start Booking <ArrowRight size={18} />
                 </Link>
-                <button onClick={() => goTo(1)} className="btn-outline" style={{ padding: '14px 32px', fontSize: 16 }}>
+                <button onClick={() => goTo(1)} className="btn-outline text-sm lg:text-base px-6 py-3 lg:px-8 lg:py-3.5">
                   See Services
                 </button>
               </div>
 
-              <div className="anim-fadeUp d4" style={{ display: 'flex', gap: 32, paddingTop: 16, borderTop: '1px solid rgba(26,60,52,0.1)' }}>
+              <div className="anim-fadeUp d4 flex gap-6 lg:gap-8 pt-6 border-t border-[#1A3C34]/10 mt-2">
                 {[['Verified', 'Partners'], ['Instant', 'Sync'], ['Secured', 'Data']].map(([v, l]) => (
                   <div key={l}>
                     <div style={{ fontSize: 22, fontWeight: 900, color: '#1A3C34', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -759,7 +745,7 @@ export default function Home() {
             </div>
 
             {/* RIGHT — Professional Image UI */}
-            <div className="anim-fadeRight d1" style={{ position: 'relative', perspective: 1200 }}>
+            <div className="anim-fadeRight d1 relative perspective-1200 w-full order-1 lg:order-2 mt-4 lg:mt-0">
               {/* Tilted background glow */}
               <div style={{
                 position: 'absolute', inset: '-10%', borderRadius: '50%',
@@ -768,16 +754,7 @@ export default function Home() {
               }} />
 
               {/* Main Professional UI Card */}
-              <div style={{
-                position: 'relative', width: '100%', height: 540,
-                borderRadius: 48, overflow: 'hidden',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                boxShadow: '0 50px 100px -20px rgba(26, 60, 52, 0.45)',
-                transition: 'transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)',
-                zIndex: 1,
-                cursor: 'default',
-              }}
+              <div className="relative w-full h-[320px] sm:h-[400px] lg:h-[540px] rounded-[32px] lg:rounded-[48px] overflow-hidden bg-white/5 border border-white/10 shadow-[0_30px_60px_-15px_rgba(26,60,52,0.4)] hover:shadow-[0_40px_80px_-20px_rgba(26,60,52,0.5)] transition-all duration-500 z-10 cursor-default"
                 onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-12px) rotateX(4deg) rotateY(-4deg)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'none'}
               >
@@ -824,7 +801,7 @@ export default function Home() {
 
         {/* ══════════ PAGE 2 — SERVICES ══════════ */}
         <Page id="services" bg="#F5F2ED">
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 48px 60px', maxWidth: 1100, margin: '0 auto' }}>
+          <div className="h-full flex flex-col justify-center px-6 lg:px-12 py-20 lg:py-16 max-w-6xl mx-auto overflow-y-auto no-scrollbar">
             <Reveal>
               <div style={{ textAlign: 'center', marginBottom: 48 }}>
                 <div className="divider" style={{ margin: '0 auto 14px' }} />
@@ -835,7 +812,7 @@ export default function Home() {
               </div>
             </Reveal>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24 }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 w-full pb-10">
               {[
                 { icon: Building2, title: 'Clinics', desc: 'Instant access to verified multi-specialty clinics. Book, manage, and track your consultations in real-time.', cta: 'Book Clinic', img: '/green_white_clinic.png', link: '/find-clinics' },
                 { icon: Stethoscope, title: 'Specialist Doctors', desc: 'Board-certified doctors across 40+ specialties. View profiles, ratings, and availability in seconds.', cta: 'Find Doctor', img: '/green_white_patient.png', link: '/find-doctors' },
@@ -902,7 +879,7 @@ export default function Home() {
         {/* ══════════ PAGE 3 — HOW IT WORKS (WORKFLOW) ══════════ */}
         <Page id="features" bg="linear-gradient(145deg, #1A3C34 0%, #0D221B 100%)">
           <div style={{ position: 'absolute', inset: 0, opacity: .03, backgroundImage: 'radial-gradient(circle,white 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 64px 60px', maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          <div className="relative z-10 h-full flex flex-col justify-center px-6 lg:px-16 py-20 lg:py-16 max-w-7xl mx-auto overflow-y-auto no-scrollbar">
 
             <Reveal>
               <div style={{ textAlign: 'center', marginBottom: 40 }}>
@@ -987,11 +964,11 @@ export default function Home() {
           {/* dot bg */}
           <div style={{ position: 'absolute', inset: 0, opacity: .05, backgroundImage: 'radial-gradient(circle,white 1px,transparent 1px)', backgroundSize: '32px 32px' }} />
 
-          <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', alignItems: 'center', gap: 64, padding: '80px 64px 60px', maxWidth: 1280, margin: '0 auto' }}>
+          <div className="relative z-10 h-full flex flex-col lg:grid lg:grid-cols-2 items-center gap-12 lg:gap-16 px-6 lg:px-16 pt-20 pb-16 lg:py-20 max-w-7xl mx-auto overflow-y-auto no-scrollbar">
 
-            {/* LEFT — medical image card (inspired by uploaded screenshot) */}
+            {/* LEFT — medical image card */}
             <Reveal>
-              <div style={{ position: 'relative', maxWidth: 540 }}>
+              <div className="relative w-full max-w-[540px] mx-auto lg:mx-0 mt-10 lg:mt-0">
                 {/* Tilted bg slab */}
                 <div style={{ position: 'absolute', inset: 12, borderRadius: 36, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', transform: 'rotate(-2deg)' }} />
 
@@ -1045,7 +1022,7 @@ export default function Home() {
             </Reveal>
 
             {/* RIGHT column — text and features */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            <div className="flex flex-col gap-6 lg:gap-8 pb-10 lg:pb-0">
               <Reveal>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <h2 style={{ fontSize: 'clamp(38px,4.5vw,58px)', fontWeight: 900, color: 'white', lineHeight: 1.05, letterSpacing: '-.03em' }}>
@@ -1097,7 +1074,7 @@ export default function Home() {
 
         {/* ══════════ PAGE 4 — TESTIMONIALS ══════════ */}
         <Page id="testimonials" bg="#F5F2ED">
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 64px 60px', maxWidth: 1280, margin: '0 auto' }}>
+          <div className="h-full flex flex-col justify-center px-6 lg:px-16 py-20 lg:py-16 max-w-7xl mx-auto overflow-y-auto no-scrollbar">
             <Reveal>
               <div style={{ textAlign: 'center', marginBottom: 48 }}>
                 <div className="divider" style={{ margin: '0 auto 14px' }} />
@@ -1108,7 +1085,7 @@ export default function Home() {
               </div>
             </Reveal>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 24 }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
               {[
                 {
                   name: 'albin', role: 'Patient', avatar: 'A',
@@ -1162,7 +1139,7 @@ export default function Home() {
         {/* ══════════ PAGE 5 — CONTACT / FOOTER ══════════ */}
         <Page id="contact" bg="linear-gradient(160deg,#0D221B 0%,#1A3C34 100%)">
           <div style={{ position: 'absolute', inset: 0, opacity: .04, backgroundImage: 'radial-gradient(circle,white 1px,transparent 1px)', backgroundSize: '28px 28px' }} />
-          <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '80px 64px 60px', maxWidth: 1280, margin: '0 auto', gap: 48 }}>
+          <div className="relative z-10 h-full flex flex-col justify-center px-6 lg:px-16 py-20 lg:py-16 max-w-7xl mx-auto gap-8 lg:gap-12 overflow-y-auto no-scrollbar">
             {/* Top: brand + cta */}
             <Reveal>
               <div style={{ textAlign: 'center' }}>
@@ -1193,9 +1170,9 @@ export default function Home() {
             <div style={{ height: 1, background: 'rgba(255,255,255,0.08)' }} />
 
             {/* Bottom: contact + links + socials */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 48 }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 w-full">
               <Reveal>
-                <div>
+                <div className="lg:col-span-2">
                   <p style={{ fontSize: 13, lineHeight: 1.75, color: 'rgba(255,255,255,0.4)', maxWidth: 280, marginBottom: 20 }}>
                     The premier multi-category healthcare appointment platform.
                   </p>
