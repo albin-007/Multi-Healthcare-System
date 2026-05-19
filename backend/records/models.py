@@ -9,6 +9,10 @@ class Prescription(models.Model):
     notes = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
+
     def __str__(self):
         return f"Prescription for {self.patient.username} by {self.doctor.name}"
 
@@ -20,6 +24,10 @@ class TestResult(models.Model):
     file = models.FileField(upload_to='test_results/', null=True, blank=True)
     is_normal = models.BooleanField(default=True) # Success/Normal flag
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
 
     def __str__(self):
         return f"TestResult for {self.patient.username} by Lab {self.lab.username}"

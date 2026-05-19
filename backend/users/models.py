@@ -28,6 +28,9 @@ class User(AbstractUser):
     gender = models.CharField(max_length=10, choices=Gender.choices, blank=True, null=True)
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     
+    id: int
+    DoesNotExist: type[Exception]
+    
     # Adding related_name to avoid conflicts with default User model during abstract setup (just in case)
     # Actually since AUTH_USER_MODEL is set, no conflicts should occur.
 
@@ -54,8 +57,11 @@ class Clinic(models.Model):
     advance_payment = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Optional advance payment amount required")
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return self.name
+    objects = models.Manager()
+    DoesNotExist: type[Exception]
+
+    def __str__(self) -> str:
+        return str(self.name)
 
 class Lab(models.Model):
     name = models.CharField(max_length=255)
@@ -72,9 +78,13 @@ class Lab(models.Model):
     advance_payment = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Optional advance payment amount required")
     home_collection_available = models.BooleanField(default=False)
     home_collection_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    average_rating = models.FloatField(default=0.0)
-    rating_count = models.IntegerField(default=0)
+    average_rating: float = models.FloatField(default=0.0) # type: ignore
+    rating_count: int = models.IntegerField(default=0) # type: ignore
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    DoesNotExist: type[Exception]
+    reviews: models.QuerySet['Feedback']
 
     def update_rating(self):
         feedbacks = self.reviews.all()
@@ -88,8 +98,8 @@ class Lab(models.Model):
             self.rating_count = 0
         self.save()
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return str(self.name)
 
 class LabTest(models.Model):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='tests')
@@ -98,6 +108,10 @@ class LabTest(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     category = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
 
     def __str__(self):
         return f"{self.name} - {self.lab.name} ({self.price})"
@@ -126,6 +140,10 @@ class VerificationDocument(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents_uploaded')
 
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
+
     def __str__(self):
         return f"{self.entity_type} #{self.entity_id} - {self.document_type}"
 
@@ -136,8 +154,12 @@ class Doctor(models.Model):
     license_no = models.CharField(max_length=100, blank=True, null=True)
     clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='doctors', null=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='doctor_profile', null=True, blank=True)
-    average_rating = models.FloatField(default=0.0)
-    rating_count = models.IntegerField(default=0)
+    average_rating: float = models.FloatField(default=0.0) # type: ignore
+    rating_count: int = models.IntegerField(default=0) # type: ignore
+
+    objects = models.Manager()
+    DoesNotExist: type[Exception]
+    reviews: models.QuerySet['Feedback']
 
     def update_rating(self):
         feedbacks = self.reviews.all()
@@ -151,8 +173,8 @@ class Doctor(models.Model):
             self.rating_count = 0
         self.save()
 
-    def __str__(self):
-        return self.name
+    def __str__(self) -> str:
+        return str(self.name)
 
 class Complaint(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='complaints_filed')
@@ -161,6 +183,10 @@ class Complaint(models.Model):
     description = models.TextField()
     is_resolved = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
 
     def __str__(self):
         return f"Complaint by {self.user.username} against {self.target_user.username}"
@@ -172,6 +198,10 @@ class Feedback(models.Model):
     rating = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)])
     comment = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -191,6 +221,10 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
+
     def __str__(self):
         return f"Notification for {self.user.username}: {self.title}"
 
@@ -205,6 +239,10 @@ class TestRequest(models.Model):
     tests = models.JSONField() # List of test names or objects
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
 
     def __str__(self):
         return f"Request from {self.doctor.name} for {self.patient.username}"

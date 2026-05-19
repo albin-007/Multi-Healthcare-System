@@ -95,7 +95,7 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         role = validated_data.get('role', User.Role.USER)
         
-        with transaction.atomic():
+        with transaction.atomic():  # type: ignore
             user = User.objects.create_user(
                 username=validated_data['username'],
                 email=validated_data.get('email', ''),
@@ -163,7 +163,7 @@ class LabTestSerializer(serializers.ModelSerializer):
         read_only_fields = ['lab', 'created_at']
 
     def get_lab_details(self, obj):
-        from .serializers import LabSerializer
+
         return {
             'id': obj.lab.id,
             'name': obj.lab.name,
@@ -233,7 +233,7 @@ class DoctorSerializer(serializers.ModelSerializer):
         phone_number = validated_data.pop('phone_number', '')
         
         try:
-            with transaction.atomic():
+            with transaction.atomic():  # type: ignore
                 user = User.objects.create_user(
                     username=username,
                     password=password,

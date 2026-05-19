@@ -17,6 +17,8 @@ class DoctorAvailability(models.Model):
     end_time = models.TimeField()
     slot_duration = models.IntegerField(default=30)  # in minutes
 
+    objects = models.Manager()
+
     class Meta:
         db_table = 'doctor_availability'
         verbose_name_plural = "Doctor Availabilities"
@@ -30,6 +32,8 @@ class DoctorBreak(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
 
+    objects = models.Manager()
+
     def __str__(self):
         return f"Break for {self.doctor.name} on {self.get_day_of_week_display()}"
 
@@ -37,6 +41,8 @@ class DoctorLeave(models.Model):
     doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='leaves')
     date = models.DateField()
     reason = models.CharField(max_length=255, blank=True, null=True)
+
+    objects = models.Manager()
 
     class Meta:
         unique_together = ('doctor', 'date')
@@ -60,6 +66,8 @@ class LabAvailability(models.Model):
     end_time = models.TimeField()
     slot_duration = models.IntegerField(default=15)
 
+    objects = models.Manager()
+
     class Meta:
         db_table = 'lab_availability'
         unique_together = ('lab', 'day_of_week')
@@ -71,6 +79,8 @@ class LabHoliday(models.Model):
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE, related_name='holidays')
     date = models.DateField()
     reason = models.CharField(max_length=200, blank=True)
+
+    objects = models.Manager()
 
     class Meta:
         db_table = 'lab_holidays'
@@ -89,13 +99,20 @@ class AppointmentSlot(models.Model):
     locked_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     locked_at = models.DateTimeField(null=True, blank=True)
 
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
+
     def is_locked(self):
         if not self.locked_at:
             return False
         from django.utils import timezone
         import datetime
         # Lock expires after 10 minutes
-        return timezone.now() < self.locked_at + datetime.timedelta(minutes=10)
+        locked_at_val = self.locked_at
+        if not isinstance(locked_at_val, datetime.datetime):
+             return False
+        return timezone.now() < locked_at_val + datetime.timedelta(minutes=10)
 
     def __str__(self):
         return f"{self.doctor.name} slot: {self.start_time}"
@@ -133,6 +150,10 @@ class Appointment(models.Model):
     cancellation_reason = models.CharField(max_length=255, blank=True, null=True)
     cancelled_by = models.CharField(max_length=50, blank=True, null=True) # Role: CLINIC, LAB, ADMIN, PATIENT
     cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    id: int
+    DoesNotExist: type[Exception]
     
     # Lab specific fields
     is_home_collection = models.BooleanField(default=False)

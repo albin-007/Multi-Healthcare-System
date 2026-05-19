@@ -345,7 +345,6 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             target_user = self.request.user
             if target_user.role in ['DOCTOR', 'CLINIC', 'ADMIN'] and 'user_id' in self.request.data:
                 try:
-                    from users.models import User
                     target_user = User.objects.get(id=self.request.data['user_id'])
                 except User.DoesNotExist:
                     pass
@@ -493,7 +492,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                     try:
                         client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
                         # Razorpay refund
-                        refund_res = client.payment.refund(payment.payment_id, {'amount': int(payment.amount * 100)})
+                        refund_res = client.payment.refund(payment.payment_id, {'amount': int(payment.amount * 100)})  # type: ignore
                         
                         payment.payment_status = Payment.Status.REFUNDED
                         payment.refund_id = refund_res.get('id')

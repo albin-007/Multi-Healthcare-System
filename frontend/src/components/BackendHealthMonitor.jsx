@@ -12,7 +12,7 @@ export default function BackendHealthMonitor() {
   const checkHealth = async () => {
     setIsChecking(true);
     try {
-      await healthApi.get(''); // Hits http://127.0.0.1:8000/api/ bypassing interceptors
+      await healthApi.get(''); // Hits the configured API_URL bypassing interceptors
       failCount.current = 0;
       setIsOffline(false);
     } catch (err) {
@@ -54,6 +54,11 @@ export default function BackendHealthMonitor() {
 
   if (!isOffline) return null;
 
+  const getBaseUrlDisplay = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    return `http://${window.location.hostname}:8000/api/`;
+  };
+
   return (
     <div style={{
       position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
@@ -92,7 +97,7 @@ export default function BackendHealthMonitor() {
             fontSize: 11, color: '#94a3b8', lineHeight: 1.6, fontWeight: 600,
           }}>
             Cannot reach the Django server at{' '}
-            <code style={{ color: '#e11d48' }}>127.0.0.1:8000</code>.
+            <code style={{ color: '#e11d48' }}>{getBaseUrlDisplay()}</code>.
             <br />Make sure it is running.
           </p>
           <div style={{ display: 'flex', gap: 16, marginTop: 12, alignItems: 'center' }}>

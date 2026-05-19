@@ -5,3 +5,6 @@ djangorestframework-simplejwt
 pillow
 python-dotenv
 razorpay
+whitenoise
+gunicorn
+psycopg2-binary

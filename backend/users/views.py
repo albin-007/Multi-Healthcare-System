@@ -10,6 +10,9 @@ import os
 from django.db.models import Sum
 from appointments.models import Appointment
 from payments.models import Payment
+from records.models import Prescription, TestResult
+from records.serializers import PrescriptionSerializer, TestResultSerializer
+from appointments.serializers import AppointmentSerializer
 
 from .models import User, Clinic, Doctor, Complaint, Feedback, Lab, VerificationDocument, Notification, LabTest, TestRequest
 from .serializers import (
@@ -97,6 +100,44 @@ class UserViewSet(viewsets.ModelViewSet):
         user.is_verified = False
         user.save()
         return Response({'status': 'User application rejected'})
+
+    @action(detail=True, methods=['get'])
+    def history(self, request, pk=None):
+        patient = self.get_object()
+        
+        # Security check: Only allow if requesting user is authorized
+        user = request.user
+        can_access = False
+        
+        if user.role == 'ADMIN' or user.id == patient.id:
+            can_access = True
+        elif user.role in ['DOCTOR', 'LAB', 'CLINIC']:
+            # Check for existing appointments
+            if user.role == 'DOCTOR':
+                doctor = getattr(user, 'doctor_profile', None)
+                if doctor:
+                    can_access = Appointment.objects.filter(user=patient, entity_type='DOCTOR', entity_id=doctor.id).exists()
+            elif user.role == 'LAB':
+                lab = getattr(user, 'lab_profile', None)
+                if lab:
+                    can_access = Appointment.objects.filter(user=patient, entity_type='LAB', entity_id=lab.id).exists()
+            elif user.role == 'CLINIC':
+                doctor_ids = Doctor.objects.filter(clinic__admin_user=user).values_list('id', flat=True)
+                can_access = Appointment.objects.filter(user=patient, entity_type='DOCTOR', entity_id__in=doctor_ids).exists()
+        
+        if not can_access:
+            return Response({"detail": "Permission denied. You must have an appointment with this patient to view their history."}, status=status.HTTP_403_FORBIDDEN)
+
+        appointments = Appointment.objects.filter(user=patient).order_by('-date')
+        prescriptions = Prescription.objects.filter(patient=patient).order_by('-created_at')
+        test_results = TestResult.objects.filter(patient=patient).order_by('-created_at')
+        
+        return Response({
+            'patient_details': UserSerializer(patient, context={'request': request}).data,
+            'appointments': AppointmentSerializer(appointments, many=True, context={'request': request}).data,
+            'prescriptions': PrescriptionSerializer(prescriptions, many=True, context={'request': request}).data,
+            'test_results': TestResultSerializer(test_results, many=True, context={'request': request}).data,
+        })
 
 
 class ClinicViewSet(viewsets.ModelViewSet):

@@ -75,6 +75,8 @@ export default function LabDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cancelAppointment, setCancelAppointment] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [selectedPatientHistory, setSelectedPatientHistory] = useState(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [analyticsTab, setAnalyticsTab] = useState('Overview'); // 'Overview' or 'Pipeline'
   const cancellationReasons = [
@@ -123,6 +125,19 @@ export default function LabDashboard() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  const fetchPatientHistory = async (patientId) => {
+    setIsLoadingHistory(true);
+    try {
+      const res = await api.get(`users/profiles/${patientId}/history/`);
+      setSelectedPatientHistory(res.data);
+    } catch (err) {
+      console.error('Failed to fetch patient history', err);
+      showToast('Failed to load patient history', 'error');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
   // ─────────────────────────────────────────────────────────────────────────────
   // DERIVED DATA
@@ -1285,13 +1300,23 @@ export default function LabDashboard() {
                                     <span className={`text-[9px] font-black ${apt.is_paid ? 'text-emerald-500' : 'text-amber-500'}`}>{apt.is_paid ? 'PAID' : 'DUE'}</span>
                                   </td>
                                   <td className="px-8 py-5">
-                                    <Badge className={`uppercase text-[9px] font-black ${
-                                      apt.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600' :
-                                      apt.status === 'CANCELLED' ? 'bg-rose-50 text-rose-600' :
-                                      'bg-brand-50 text-brand-600'
-                                    }`}>
-                                      {apt.status}
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                      <Badge className={`uppercase text-[9px] font-black ${
+                                        apt.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600' :
+                                        apt.status === 'CANCELLED' ? 'bg-rose-50 text-rose-600' :
+                                        'bg-brand-50 text-brand-600'
+                                      }`}>
+                                        {apt.status}
+                                      </Badge>
+                                      <Button 
+                                        variant="ghost" 
+                                        onClick={() => fetchPatientHistory(apt.user?.id)}
+                                        className="h-8 w-8 p-0 rounded-lg hover:bg-brand-50 text-brand-600"
+                                        title="View Patient History"
+                                      >
+                                        <History className="w-4 h-4" />
+                                      </Button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))
@@ -2558,6 +2583,141 @@ export default function LabDashboard() {
                
                <Button onClick={() => setSelectedAppointment(null)} className="w-full h-14 bg-slate-900 hover:bg-black text-white font-black rounded-2xl mt-4 shadow-xl shadow-slate-900/10">Close Details</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Patient History Modal ────────────────────────────────── */}
+      {selectedPatientHistory && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col border border-brand-50 dark:border-slate-800">
+            <header className="p-8 border-b border-slate-50 flex items-center justify-between bg-gradient-to-r from-brand-600 to-brand-700 text-white">
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-md flex items-center justify-center text-3xl font-black border border-white/20">
+                  {selectedPatientHistory.patient_details?.avatar_url ? (
+                    <img src={selectedPatientHistory.patient_details.avatar_url} className="w-full h-full object-cover rounded-3xl" alt="Patient" />
+                  ) : (
+                    (selectedPatientHistory.patient_details?.first_name?.[0] || 'P').toUpperCase()
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-3xl font-black tracking-tight">{selectedPatientHistory.patient_details?.first_name} {selectedPatientHistory.patient_details?.last_name}</h3>
+                  <div className="flex items-center gap-4 mt-2">
+                    <span className="text-brand-100 font-bold flex items-center gap-2"><UserIcon className="w-4 h-4" /> ID: P-{selectedPatientHistory.patient_details?.id}</span>
+                    <span className="text-brand-100 font-bold flex items-center gap-2"><Activity className="w-4 h-4" /> {selectedPatientHistory.patient_details?.age} Years • {selectedPatientHistory.patient_details?.gender}</span>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedPatientHistory(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl transition-all border border-white/10">
+                <X className="w-6 h-6" />
+              </button>
+            </header>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar bg-brand-50/20 dark:bg-slate-950/20">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-brand-50 dark:border-slate-800">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Total Visits</p>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">{selectedPatientHistory.appointments?.length || 0}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-brand-50 dark:border-slate-800">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Diagnostic Tests</p>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">{selectedPatientHistory.test_results?.length || 0}</p>
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-brand-50 dark:border-slate-800">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Prescriptions</p>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white">{selectedPatientHistory.prescriptions?.length || 0}</p>
+                </div>
+              </div>
+
+              {/* History Timeline */}
+              <div className="space-y-6">
+                <h4 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                  <History className="w-6 h-6 text-brand-600" /> Comprehensive Timeline
+                </h4>
+                
+                <div className="space-y-4">
+                  {/* Test Results Section */}
+                  {selectedPatientHistory.test_results?.length > 0 && (
+                    <div className="space-y-4">
+                      <h5 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Diagnostic Reports</h5>
+                      <div className="grid gap-4">
+                        {selectedPatientHistory.test_results.map(res => (
+                          <div key={res.id} className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-brand-50 dark:border-slate-800 shadow-sm group hover:shadow-md transition-all">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${res.is_normal ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                  <FileCheck2 className="w-6 h-6" />
+                                </div>
+                                <div>
+                                  <p className="font-black text-slate-900 dark:text-white">{res.appointment?.entity_name || 'Laboratory Test'}</p>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(res.created_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                                </div>
+                              </div>
+                              <Badge className={`uppercase text-[9px] font-black px-3 py-1 ${res.is_normal ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                                {res.is_normal ? 'Normal' : 'Abnormal'}
+                              </Badge>
+                            </div>
+                            <div className="p-4 bg-brand-50/50 dark:bg-slate-950/50 rounded-2xl border border-brand-50 dark:border-slate-800">
+                               <p className="text-sm font-bold text-slate-600 dark:text-slate-400 italic">" {res.result_data} "</p>
+                            </div>
+                            {res.file && (
+                              <div className="mt-4 flex justify-end">
+                                <a href={res.file} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-brand-600 font-black text-xs hover:underline">
+                                  <Download className="w-4 h-4" /> Download Report PDF
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Prescriptions Section */}
+                  {selectedPatientHistory.prescriptions?.length > 0 && (
+                    <div className="space-y-4 pt-4">
+                      <h5 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Prescriptions & Consultations</h5>
+                      <div className="grid gap-4">
+                        {selectedPatientHistory.prescriptions.map(pres => (
+                          <div key={pres.id} className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-brand-50 dark:border-slate-800 shadow-sm border-l-4 border-l-blue-500">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                  <Stethoscope className="w-6 h-6" />
+                                </div>
+                                <div>
+                                  <p className="font-black text-slate-900 dark:text-white">Dr. {pres.doctor?.name}</p>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(pres.created_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">{pres.doctor?.specialty}</span>
+                            </div>
+                            <div className="p-4 bg-blue-50/30 dark:bg-blue-500/5 rounded-2xl border border-blue-50 dark:border-blue-900/20">
+                               <p className="text-sm font-bold text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{pres.notes}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(!selectedPatientHistory.test_results?.length && !selectedPatientHistory.prescriptions?.length) && (
+                    <div className="py-20 text-center bg-white dark:bg-slate-900 rounded-[2.5rem] border border-dashed border-slate-200">
+                      <ShieldCheck className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                      <h4 className="text-lg font-bold text-slate-900 dark:text-white">Clear Medical History</h4>
+                      <p className="text-sm text-slate-500 font-medium max-w-xs mx-auto mt-2">No past diagnostic reports or prescriptions found for this patient in our records.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <footer className="p-8 border-t border-slate-50 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-end">
+              <Button onClick={() => setSelectedPatientHistory(null)} className="h-14 px-12 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-black transition-all">
+                Close Record
+              </Button>
+            </footer>
           </div>
         </div>
       )}

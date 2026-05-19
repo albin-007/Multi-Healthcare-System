@@ -11,11 +11,11 @@ class AvailabilitySerializer(serializers.ModelSerializer):
         model = DoctorAvailability
         fields = ['id', 'doctor', 'day_of_week', 'day_display', 'start_time', 'end_time', 'slot_duration']
 
-    def validate(self, data):
-        doctor = data.get('doctor')
-        day = data.get('day_of_week')
-        start = data.get('start_time')
-        end = data.get('end_time')
+    def validate(self, attrs):
+        doctor = attrs.get('doctor')
+        day = attrs.get('day_of_week')
+        start = attrs.get('start_time')
+        end = attrs.get('end_time')
 
         if start >= end:
             raise serializers.ValidationError("Start time must be before end time.")
@@ -34,7 +34,7 @@ class AvailabilitySerializer(serializers.ModelSerializer):
         if overlaps.exists():
             raise serializers.ValidationError("This time range overlaps with an existing schedule for this day.")
 
-        return data
+        return attrs
 
 class DoctorBreakSerializer(serializers.ModelSerializer):
     day_display = serializers.CharField(source='get_day_of_week_display', read_only=True)
@@ -43,10 +43,10 @@ class DoctorBreakSerializer(serializers.ModelSerializer):
         model = DoctorBreak
         fields = ['id', 'doctor', 'day_of_week', 'day_display', 'start_time', 'end_time']
 
-    def validate(self, data):
-        if data.get('start_time') >= data.get('end_time'):
+    def validate(self, attrs):
+        if attrs.get('start_time') >= attrs.get('end_time'):
             raise serializers.ValidationError("Start time must be before end time.")
-        return data
+        return attrs
 
 class DoctorLeaveSerializer(serializers.ModelSerializer):
     class Meta:
@@ -61,12 +61,12 @@ class LabAvailabilitySerializer(serializers.ModelSerializer):
         fields = ['id', 'lab', 'day_of_week', 'day_display', 'start_time', 'end_time', 'slot_duration']
         read_only_fields = ['lab']
 
-    def validate(self, data):
-        start = data.get('start_time')
-        end = data.get('end_time')
+    def validate(self, attrs):
+        start = attrs.get('start_time')
+        end = attrs.get('end_time')
         if start >= end:
             raise serializers.ValidationError("Start time must be before end time.")
-        return data
+        return attrs
 
 class LabHolidaySerializer(serializers.ModelSerializer):
     class Meta:
