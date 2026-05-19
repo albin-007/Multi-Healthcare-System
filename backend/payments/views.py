@@ -30,7 +30,7 @@ class CreateUPIOrderView(APIView):
             
             try:
                 # Attempt to create real Razorpay order
-                order = client.order.create(data=data)
+                order = client.order.create(data=data)  # type: ignore
                 return Response({
                     'order_id': order['id'],
                     'amount': order['amount'],
@@ -69,7 +69,7 @@ class VerifyUPIPaymentView(APIView):
             is_mock = data.get('razorpay_order_id', '').startswith('order_mock_')
             
             if not (settings.DEBUG and (is_placeholder or is_mock)):
-                client.utility.verify_payment_signature({
+                client.utility.verify_payment_signature({  # type: ignore
                     'razorpay_order_id': data.get('razorpay_order_id'),
                     'razorpay_payment_id': data.get('razorpay_payment_id'),
                     'razorpay_signature': data.get('razorpay_signature')

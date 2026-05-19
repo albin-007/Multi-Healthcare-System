@@ -167,8 +167,8 @@ CORS_ALLOW_ALL_ORIGINS = True  # Allow all for development
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Razorpay Configuration
-RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', 'rzp_test_your_id_here')
-RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', 'your_secret_here')
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', 'rzp_test_SrAwtBxmGpR4yJ')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', 'uHOqOB3J7Yx34bpeZR93rBAl')
 
 # Media Files (User Uploads)
 MEDIA_URL = '/media/'
