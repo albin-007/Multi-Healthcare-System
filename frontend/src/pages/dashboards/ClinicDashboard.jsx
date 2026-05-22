@@ -587,7 +587,7 @@ export default function ClinicDashboard() {
   const topDoctors = getDoctorRankings();
 
   const renderAppointmentTable = (apptsList) => (
-    <div className="overflow-x-auto">
+    <div className="table-container no-scrollbar">
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
@@ -1148,7 +1148,7 @@ export default function ClinicDashboard() {
                     <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1">Track patient payments and modes of transaction</p>
                   </div>
                </div>
-               <div className="overflow-x-auto">
+               <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
@@ -1225,7 +1225,7 @@ export default function ClinicDashboard() {
                     <Badge className="bg-emerald-50 text-emerald-600 border-0 font-bold px-4 py-2">{prescriptions.length} Records</Badge>
                  </div>
                  
-                 <div className="overflow-x-auto">
+                 <div className="table-container no-scrollbar">
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
@@ -1294,7 +1294,7 @@ export default function ClinicDashboard() {
               </div>
 
               <div className="bg-white dark:bg-slate-900 rounded-3xl border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-slate-50/50 dark:bg-slate-800/50">
@@ -1618,7 +1618,7 @@ export default function ClinicDashboard() {
            </div>
 
            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="table-container no-scrollbar">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">

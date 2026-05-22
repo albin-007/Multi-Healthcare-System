@@ -10,6 +10,7 @@ import {
   Loader2, Phone, Mail, Hash, MapPin, Sparkles, FileUp,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import Logo from '../components/ui/Logo';
 
 /* ─── Document types ──────────────────────────────────────────────────── */
 const CLINIC_DOC_TYPES = [
@@ -255,7 +256,7 @@ export default function Register() {
       <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl shadow-slate-200/60 border border-slate-100 overflow-hidden flex flex-col lg:flex-row">
 
         {/* ── Left brand panel ─────────────────────────────────────── */}
-        <div className="lg:w-5/12 bg-[#002D33] p-10 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="hidden lg:flex lg:w-5/12 bg-[#002D33] p-10 text-white flex-col justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(0,201,177,0.15),transparent_65%)]" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-600/5 rounded-full -ml-32 -mb-32 blur-3xl" />
 
@@ -309,7 +310,14 @@ export default function Register() {
         </div>
 
         {/* ── Right form panel ──────────────────────────────────────── */}
-        <div className="lg:w-7/12 p-8 lg:p-10 flex flex-col overflow-y-auto max-h-[90vh]">
+        <div className="w-full lg:w-7/12 p-8 lg:p-10 flex flex-col overflow-y-auto max-h-[90vh]">
+          
+          {/* Logo on mobile viewports */}
+          <div className="lg:hidden mb-6 flex justify-center">
+            <Link to="/" className="no-underline">
+              <Logo size="md" variant="dark" />
+            </Link>
+          </div>
 
           {/* Header */}
           <div className="flex items-start justify-between mb-6">

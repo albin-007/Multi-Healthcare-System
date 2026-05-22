@@ -87,3 +87,19 @@
 .animate-pulse-glow {
   animation: pulse-glow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Mobile & scroll utilities */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

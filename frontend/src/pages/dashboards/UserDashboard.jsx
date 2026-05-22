@@ -731,7 +731,7 @@ export default function UserDashboard() {
               </div>
 
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">
@@ -1210,7 +1210,7 @@ export default function UserDashboard() {
                 </div>
               ) : (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
-                  <div className="overflow-x-auto">
+                  <div className="table-container no-scrollbar">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">

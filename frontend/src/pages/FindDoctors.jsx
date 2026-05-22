@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, MapPin, Stethoscope, HeartPulse, Brain, Baby, 
   Activity, Bone, ArrowRight, ChevronRight, Star, ShieldCheck,
-  User, Building2
+  User, Building2, Phone
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { SPECIALIZATION_GROUPS } from '../data/specializations';
+import Navbar from '../components/layout/Navbar';
 
 // Mapping specializations to icons for the grid
 const specIconMap = {
@@ -54,9 +55,11 @@ const FindDoctors = () => {
   const filteredDoctors = useMemo(() => {
     if (!searchTerm && !location) return [];
     return doctors.filter(doc => {
-      const nameMatch = doc.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                       doc.specialty?.toLowerCase().includes(searchTerm.toLowerCase());
-      const locationMatch = !location || (doc.clinic?.address || '').toLowerCase().includes(location.toLowerCase()) ||
+      const nameMatch = !searchTerm || 
+                       (doc.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                       (doc.specialty || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const locationMatch = !location || 
+                           (doc.clinic?.address || '').toLowerCase().includes(location.toLowerCase()) ||
                            (doc.clinic?.name || '').toLowerCase().includes(location.toLowerCase());
       return nameMatch && locationMatch;
     });
@@ -88,21 +91,7 @@ const FindDoctors = () => {
   return (
     <div className="min-h-screen bg-[#F5F2ED] font-sans overflow-x-hidden">
       {/* ── Navigation ── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4 bg-white/80 backdrop-blur-md border-b border-[#1A3C34]/10">
-        <Link to="/" className="no-underline">
-          <Logo size="md" variant="dark" />
-        </Link>
-        <div className="flex gap-4">
-          {!isAuthenticated ? (
-            <>
-              <Link to="/login" className="px-6 py-2 rounded-full border border-[#1A3C34]/20 font-semibold text-[#1A3C34] hover:bg-[#1A3C34]/5 transition-all no-underline text-sm">Login</Link>
-              <Link to="/register" className="px-6 py-2 rounded-full bg-[#1A3C34] font-semibold text-white shadow-lg hover:shadow-xl transition-all no-underline text-sm">Get Started</Link>
-            </>
-          ) : (
-            <Link to={userRole === 'ADMIN' ? '/admin' : userRole === 'CLINIC' ? '/clinic' : userRole === 'DOCTOR' ? '/doctor' : userRole === 'LAB' ? '/lab' : '/patient'} className="px-6 py-2 rounded-full bg-[#1A3C34] font-semibold text-white shadow-lg hover:shadow-xl transition-all no-underline text-sm">Dashboard</Link>
-          )}
-        </div>
-      </nav>
+      <Navbar />
 
       {/* ── Hero Section ── */}
       <section className="relative pt-32 pb-20 px-6">

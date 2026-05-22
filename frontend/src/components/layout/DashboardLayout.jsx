@@ -345,7 +345,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Scrollable Main Content */}
-        <main className="flex-1 overflow-y-auto no-scrollbar p-6 md:p-10">
+        <main className="flex-1 overflow-y-auto no-scrollbar p-4 sm:p-6 md:p-10">
           <div className="max-w-[1600px] mx-auto">
             <Outlet />
           </div>

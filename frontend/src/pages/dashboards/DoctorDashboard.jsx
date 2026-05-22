@@ -781,7 +781,7 @@ export default function DoctorDashboard() {
                     </h4>
                   </div>
                   <div className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-brand-50 dark:border-slate-800 shadow-xl shadow-slate-200/20">
-                    <form onSubmit={handleAddBreak} className="grid grid-cols-3 gap-4 items-end mb-6">
+                    <form onSubmit={handleAddBreak} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end mb-6">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Day</label>
                         <select 
@@ -897,7 +897,7 @@ export default function DoctorDashboard() {
               </div>
 
               <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">
@@ -998,7 +998,7 @@ export default function DoctorDashboard() {
                      <History className="w-5 h-5 text-brand-600" /> Prescribed Tests Log
                    </h4>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
@@ -1090,7 +1090,7 @@ export default function DoctorDashboard() {
               </div>
 
               <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">

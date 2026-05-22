@@ -6,6 +6,7 @@ import { HeartPulse, AlertCircle, Eye, EyeOff, ShieldCheck, Lock, ArrowRight, Us
 import { Input } from '../components/ui/Input';
 import { Label } from '../components/ui/Label';
 import { Button } from '../components/ui/Button';
+import Logo from '../components/ui/Logo';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -116,7 +117,7 @@ export default function Login() {
       <div className="w-full max-w-3xl bg-white rounded-[2rem] shadow-[0_40px_80px_-20px_rgba(0,42,51,0.15)] overflow-hidden flex flex-col md:flex-row min-h-[580px]">
         
         {/* Left Section: Brand Showcase (Dark) */}
-        <div className="md:w-4/12 bg-[#002D33] p-8 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="hidden md:flex md:w-4/12 bg-[#002D33] p-8 text-white flex-col justify-between relative overflow-hidden">
           {/* Decorative background glow */}
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(0,201,177,0.12),transparent_70%)]"></div>
           
@@ -168,7 +169,12 @@ export default function Login() {
         </div>
 
         {/* Right Section: Sign In Form (Light) */}
-        <div className="md:w-8/12 p-8 sm:p-10 flex flex-col justify-center">
+        <div className="w-full md:w-8/12 p-8 sm:p-10 flex flex-col justify-center">
+          <div className="md:hidden mb-6 flex justify-center">
+            <Link to="/" className="no-underline">
+              <Logo size="md" variant="dark" />
+            </Link>
+          </div>
           <div className="mb-8 flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">Sign In</h2>

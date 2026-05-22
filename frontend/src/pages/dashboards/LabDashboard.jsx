@@ -941,7 +941,7 @@ export default function LabDashboard() {
                   <Badge className="bg-brand-50 dark:bg-slate-950 text-brand-700 border-0 font-bold px-4 py-2 text-sm">{pendingRequests.length} Pending</Badge>
                 </div>
                 
-                <div className="flex-1 overflow-x-auto">
+                <div className="flex-1 table-container no-scrollbar">
                    <table className="w-full text-left whitespace-nowrap">
                      <thead>
                        <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">
@@ -1078,7 +1078,7 @@ export default function LabDashboard() {
                       ].map((kpi, idx) => (
                         <div key={idx} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-sm relative overflow-hidden group">
                           <div className={`absolute top-0 right-0 w-24 h-24 ${kpi.bg} opacity-20 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2`} />
-                          <div className="flex justify-between items-start relative z-10">
+                          <div className={`flex justify-between items-start relative z-10`}>
                             <div className={`w-12 h-12 rounded-2xl ${kpi.bg} ${kpi.color} flex items-center justify-center shadow-sm`}>
                               <kpi.icon className="w-6 h-6" />
                             </div>
@@ -1256,7 +1256,7 @@ export default function LabDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex-1 overflow-x-auto">
+                      <div className="flex-1 table-container no-scrollbar">
                         <table className="w-full text-left whitespace-nowrap">
                           <thead>
                             <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
@@ -1429,7 +1429,7 @@ export default function LabDashboard() {
                   </div>
                 </div>
                 
-                <div className="flex-1 overflow-x-auto">
+                <div className="flex-1 table-container no-scrollbar">
                    <table className="w-full text-left whitespace-nowrap">
                      <thead>
                        <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">
@@ -1612,7 +1612,7 @@ export default function LabDashboard() {
                   <Badge className="bg-emerald-50 text-emerald-700 border-0 font-bold px-4 py-2 text-sm">{testResults.length} Reports</Badge>
                 </div>
                 
-                <div className="flex-1 overflow-x-auto">
+                <div className="flex-1 table-container no-scrollbar">
                    <table className="w-full text-left whitespace-nowrap">
                      <thead>
                        <tr className="bg-brand-50 dark:bg-slate-950 border-b border-brand-50 dark:border-slate-800">
@@ -1901,7 +1901,7 @@ export default function LabDashboard() {
               </div>
 
               <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-brand-50 dark:border-slate-800 shadow-xl overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-slate-50/50 dark:bg-slate-800/50">
@@ -1982,7 +1982,7 @@ export default function LabDashboard() {
                     <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1">Track patient payments and modes of transaction</p>
                   </div>
                </div>
-               <div className="overflow-x-auto">
+               <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">

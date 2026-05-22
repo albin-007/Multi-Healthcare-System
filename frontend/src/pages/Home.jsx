@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Logo from '../components/ui/Logo';
 import { useAuth } from '../hooks/useAuth';
+import Navbar from '../components/layout/Navbar';
 import {
   HeartPulse, Stethoscope, ActivitySquare, Building2,
   ArrowRight, Phone, Mail, MapPin, Facebook, Twitter,
@@ -622,55 +623,29 @@ export default function Home() {
             display: block !important;
           }
         }
+        @media (max-width: 1024px) {
+          #snap-container {
+            height: auto !important;
+            overflow-y: visible !important;
+            scroll-snap-type: none !important;
+          }
+          section {
+            height: auto !important;
+            min-height: auto !important;
+            scroll-snap-align: none !important;
+            scroll-snap-stop: normal !important;
+            overflow: visible !important;
+          }
+        }
       `}</style>
 
-      {/* ──────────── NAVBAR (fixed, always on top) ──────────── */}
-      <nav className={`fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-6 lg:px-12 py-4 transition-all duration-350 ${active === 0 ? 'bg-transparent' : 'bg-[#F5F2ED]/90 backdrop-blur-xl border-b border-[#1A3C34]/5'}`}>
-        <Link to="/" style={{ textDecoration: 'none' }}>
-          <Logo size="md" variant="dark" />
-        </Link>
-
-        {/* Desktop nav links */}
-        <div className="hidden lg:flex gap-8">
-          {SECTIONS.slice(0, 6).map((s, i) => (
-            <button
-              key={s}
-              onClick={() => goTo(i)}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 14, fontWeight: 600, letterSpacing: '.01em',
-                color: active === i ? '#1A3C34' : 'rgba(26,60,52,0.55)',
-                textTransform: 'capitalize',
-                borderBottom: active === i ? '2px solid #1A3C34' : '2px solid transparent',
-                paddingBottom: 2, transition: 'all .2s',
-              }}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-
-        {/* CTA */}
-        <div className="flex items-center gap-3">
-          {!isAuthenticated ? (
-            <>
-              <Link to="/login" className="btn-outline hidden sm:flex text-sm px-4 py-2">Login</Link>
-              <Link to="/register" className="btn-dark text-sm px-4 py-2 lg:px-5 lg:py-2.5">
-                Get Started <ArrowRight size={16} />
-              </Link>
-            </>
-          ) : (
-            <Link to={getDashboardPath()} className="btn-dark text-sm px-4 py-2 lg:px-5 lg:py-2.5">
-              Dashboard <ArrowRight size={16} />
-            </Link>
-          )}
-        </div>
-      </nav>
+      {/* ──────────── NAVBAR ──────────── */}
+      <Navbar activeSection={active} onSectionClick={goTo} />
 
       {/* ──────────── SIDE NAV DOTS ──────────── */}
-      <div style={{
+      <div className="hidden lg:flex" style={{
         position: 'fixed', right: 24, top: '50%', transform: 'translateY(-50%)',
-        zIndex: 100, display: 'flex', flexDirection: 'column', gap: 10,
+        zIndex: 100, flexDirection: 'column', gap: 10,
       }}>
         {SECTIONS.map((s, i) => (
           <button
@@ -793,7 +768,7 @@ export default function Home() {
           </div>
 
           {/* Scroll hint */}
-          <button onClick={() => goTo(1)} style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, animation: 'fadeUp 1s ease 1.5s both' }}>
+          <button onClick={() => goTo(1)} className="hidden lg:flex flex-col items-center" style={{ position: 'absolute', bottom: 28, left: '50%', transform: 'translateX(-50%)', background: 'none', border: 'none', cursor: 'pointer', gap: 6, animation: 'fadeUp 1s ease 1.5s both' }}>
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.1em', color: 'rgba(26,60,52,0.4)', textTransform: 'uppercase' }}>Scroll</span>
             <ChevronDown size={20} color="rgba(26,60,52,0.35)" style={{ animation: 'floatY 2s ease-in-out infinite' }} />
           </button>

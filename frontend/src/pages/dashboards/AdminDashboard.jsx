@@ -850,7 +850,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="bg-white dark:bg-slate-900 dark:bg-slate-900 rounded-2xl border border-brand-50 dark:border-slate-800 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800 dark:border-slate-800">
@@ -956,7 +956,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">
@@ -1030,7 +1030,7 @@ export default function AdminDashboard() {
 
               <h3 className="text-xl font-black text-slate-900 dark:text-white mt-8 mb-4">Transaction History</h3>
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-brand-50 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-container no-scrollbar">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-brand-50 dark:bg-slate-950/50 border-b border-brand-50 dark:border-slate-800">

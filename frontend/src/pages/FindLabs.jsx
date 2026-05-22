@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import Navbar from '../components/layout/Navbar';
 
 const HEALTH_CONCERNS = [
   { name: 'Diabetes', icon: Activity, color: '#FF6B6B', tests: 'HbA1c, Fasting Blood Sugar' },
@@ -80,21 +81,7 @@ const FindLabs = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-[#00C2A8]/20 overflow-x-hidden">
       {/* ── Navigation ── */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-8 py-4 bg-white/80 backdrop-blur-xl border-b border-[#1A3C34]/5 shadow-sm">
-        <Link to="/" className="no-underline">
-          <Logo size="md" variant="dark" />
-        </Link>
-        <div className="flex gap-4">
-          {!isAuthenticated ? (
-            <>
-              <Link to="/login" className="px-6 py-2.5 rounded-2xl border-2 border-[#1A3C34]/10 font-black text-[#1A3C34] hover:bg-[#1A3C34] hover:text-white transition-all no-underline text-[10px] uppercase tracking-widest">Login</Link>
-              <Link to="/register" className="px-6 py-2.5 rounded-2xl bg-[#1A3C34] font-black text-white shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all no-underline text-[10px] uppercase tracking-widest">Get Started</Link>
-            </>
-          ) : (
-            <Link to={userRole === 'ADMIN' ? '/admin' : userRole === 'CLINIC' ? '/clinic' : userRole === 'DOCTOR' ? '/doctor' : userRole === 'LAB' ? '/lab' : '/patient'} className="px-6 py-2.5 rounded-2xl bg-[#1A3C34] font-black text-white shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all no-underline text-[10px] uppercase tracking-widest">Dashboard</Link>
-          )}
-        </div>
-      </nav>
+      <Navbar />
 
       {/* ── Hero Section ── */}
       <section className="relative pt-40 pb-24 px-6 overflow-hidden bg-white">
