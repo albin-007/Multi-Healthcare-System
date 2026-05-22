@@ -92,6 +92,10 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 import shutil
 
+import urllib.parse as urlparse
+
+db_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL') or os.environ.get('SUPABASE_DATABASE_URL')
+
 if os.environ.get('POSTGRES_DATABASE'):
     DATABASES = {
         'default': {
@@ -101,6 +105,18 @@ if os.environ.get('POSTGRES_DATABASE'):
             'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
             'HOST': os.environ.get('POSTGRES_HOST'),
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
+    }
+elif db_url:
+    url = urlparse.urlparse(db_url)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': url.path[1:],
+            'USER': url.username,
+            'PASSWORD': url.password,
+            'HOST': url.hostname,
+            'PORT': url.port or '5432',
         }
     }
 else:
