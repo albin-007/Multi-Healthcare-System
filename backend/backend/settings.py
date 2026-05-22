@@ -90,12 +90,52 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+import shutil
+
+if os.environ.get('POSTGRES_DATABASE'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DATABASE'),
+            'USER': os.environ.get('POSTGRES_USER'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
+            'HOST': os.environ.get('POSTGRES_HOST'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        }
     }
-}
+else:
+    db_path = BASE_DIR / 'db.sqlite3'
+    
+    # Check if the database path is writable (Vercel serverless runtime is read-only)
+    is_writable = False
+    try:
+        if db_path.exists():
+            with open(db_path, 'a'):
+                pass
+        else:
+            # Check if directory is writable by creating a temporary file
+            test_file = BASE_DIR / '.write_test'
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+        is_writable = True
+    except (IOError, OSError):
+        is_writable = False
+
+    if not is_writable:
+        # Move the database to the writable /tmp folder in Vercel lambda container
+        writable_db = Path('/tmp') / 'db.sqlite3'
+        if not writable_db.exists() and db_path.exists():
+            shutil.copy2(db_path, writable_db)
+        db_path = writable_db
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': db_path,
+        }
+    }
+
 
 
 # Password validation
